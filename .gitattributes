@@ -1,0 +1,6 @@
+# Line-ending policy: golden files are byte-compared via include_str!, so they
+# must check out as LF on every platform (Windows runners otherwise convert to
+# CRLF and the byte-exact golden tests fail). Rust sources are pinned to LF too.
+* text=auto
+*.rs text eol=lf
+tests/golden/* text eol=lf

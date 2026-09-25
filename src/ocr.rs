@@ -7,7 +7,7 @@ const ABSENT:&str="OCR engine not found";
 pub struct OcrResult{pub text:String,pub confidence:Option<f32>}
 struct Scratch(PathBuf);
 impl Drop for Scratch{fn drop(&mut self){let _=fs::remove_dir_all(&self.0);}}
-fn scratch()->Result<Scratch>{for _ in 0..100{let p=std::env::temp_dir().join(format!("docconvert-ocr-{}-{}",std::process::id(),NEXT.fetch_add(1,Ordering::Relaxed)));let mut b=fs::DirBuilder::new();#[cfg(unix)]{use std::os::unix::fs::DirBuilderExt;b.mode(0o700);}match b.create(&p){Ok(())=>return Ok(Scratch(p)),Err(e)if e.kind()==std::io::ErrorKind::AlreadyExists=>continue,Err(e)=>return Err(e.into())}}Err(ConvertError::Ocr("could not reserve temporary directory".into()))}
+fn scratch()->Result<Scratch>{for _ in 0..100{let p=std::env::temp_dir().join(format!("docconvert-ocr-{}-{}",std::process::id(),NEXT.fetch_add(1,Ordering::Relaxed)));#[allow(unused_mut)]let mut b=fs::DirBuilder::new();#[cfg(unix)]{use std::os::unix::fs::DirBuilderExt;b.mode(0o700);}match b.create(&p){Ok(())=>return Ok(Scratch(p)),Err(e)if e.kind()==std::io::ErrorKind::AlreadyExists=>continue,Err(e)=>return Err(e.into())}}Err(ConvertError::Ocr("could not reserve temporary directory".into()))}
 pub fn run_ocr(bytes:&[u8],opts:&Options)->Result<OcrResult>{
     if opts.ocr_mode==OcrMode::Off{return Err(ConvertError::Config("OCR adapter called while OCR is off".into()))}
     let temp=scratch()?;let input=temp.0.join(format!("input.{}",image_kind(bytes).map(|k|k.ext()).unwrap_or("bin")));let output=temp.0.join("output");
