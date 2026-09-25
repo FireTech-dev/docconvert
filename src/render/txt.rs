@@ -2,7 +2,7 @@ use crate::model::*;
 fn inline(xs:&[Inline],minimal:bool)->String{
     let mut out=String::new();
     for x in xs{out.push_str(&match x{
-        Inline::Link{children,url}=>{let text=inline(children,minimal);if &text==url{text}else{format!("{text} ({url})")}},
+        Inline::Link{children,url}=>{let text=inline(children,minimal);if url.is_empty()||&text==url{text}else{format!("{text} ({url})")}},
         Inline::Styled{children,..}=>inline(children,minimal),
         Inline::Image{alt,..}=>if minimal{alt.clone().unwrap_or_default()}else{alt.as_ref().map(|s|format!("[Image: {s}]")).unwrap_or_else(||"[Image]".into())},
         _=>inline_text(std::slice::from_ref(x)),

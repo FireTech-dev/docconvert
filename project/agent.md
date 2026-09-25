@@ -6,7 +6,7 @@
 > **Created From:** `project/agent.template.md`
 > **Status:** In Progress — P6-S05 close-out blocked; §14 evidence pending; git initialized, commit pending
 > **Created:** 2026-09-16
-> **Last Updated:** 2026-09-24
+> **Last Updated:** 2026-09-25
 
 # Current Status
 
@@ -18,13 +18,13 @@ Current Step: P6-S05 — Samples, README, packaging
 
 Current Objective: All phases complete. Project verified.
 
-Overall Progress: Audit queue in motion. PDF path restored (pdf-extract 0.12.1, real-PDF clean); guards added (attribution, OCR-gate, PK-magics, capped-read). Suite 105/1 green. Open Architect questions AQ-006–AQ-009; release Done still blocked — remaining single steps + §14 evidence pending.
+Overall Progress: P6-S05 In Progress. CI 10/10 user-reported green. AQ-012 FIXED (text-wins + zero-yield placeholders; Database 9KB/0-text → 3.47MB text). Release Done still blocked — 24h fuzz, commit-remainder, reviews, tag pending.
 
 Repository Status
-- Current Branch: master (freshly initialized)
-- Latest Commit: None (initial commit pending)
-- Working Tree: Source, tests, documentation and preserved supplied documents. Files staged for commit.
-- Last Successful Build: 2026-09-23 — `cargo build --locked` clean (zero warnings), toolchain 1.98.0.
+- Current Branch: main (tracks origin/main)
+- Latest Commit: 9cc9be1 (Windows CI fix, pushed 2026-09-25; prior user commits: first commit + pinned-actions SHA fix)
+- Working Tree: fix files committed clean; remainder of tree state as staged/committed by user
+- Last Successful Build: 2026-09-25 — `cargo build --locked` clean (zero warnings), toolchain 1.98.0.
 
 # 1. Project Summary
 
@@ -134,13 +134,13 @@ Objective: Samples generator, README, usage docs, error reference, packaging not
 
 Status: **In Progress — user "fix them all" batch 2026-09-24** — AQ-006/007/008/009 resolved with documented decisions + tests; queue (d)(e)(f)(g) fixed+verified; suite 115/1. No tag.
 
-Next Step: (h) samples_gen every-fixture enumeration — BLOCKED, needs Architect fixture list (representative-only gap open, not claimed); then initial commit + architecture/security reviews + tag.
+Next Step: (h) DONE 2026-09-25 by user-authorized documented decision, blueprint unchanged — see Session Log. Then: initial commit + architecture/security reviews + tag (no tag until §14 evidenced).
 
 Relevant Skills: docs, packaging, CI (`skills/docs.md`, `skills/packaging.md`, `skills/ci.md` loaded for close-out).
 
 Acceptance Criteria: NOT MET — §14 items 1–5, 7 without full evidence; `samples_gen` covers representative only (enumeration still Architect-blocked, not claimed); no fuzz hours; CI YAML not run (both-profile runs unverified locally; pdf-layout needs native PDFium). Release evidence 2026-09-24: default release binary 4,303,552 bytes (4.1MiB, within ≤5MB; was 3.0M pre-pdf-extract) — `cargo build --locked --release --offline`, toolchain 1.98.0. Full suite 115 passed, 0 failed, 1 ignored (baseline 107/1 → +8: placeholder, reason, CLI precedence, OMML bound, DOCX header, date_tokens, scanned-Force, CLI batch).
 
-Status: In Progress — 2026-09-24 remaining-issues batch: shared-Pdfium fix (multi-bind bug), A12 mapping, samples 25/25, both release sizes, perf evidence, CI SHA pins, fuzz harness + smoke runs; default 130/1 + layout 140/1 green. Still open: real-doc corpus, full 24h fuzz, CI execution, commit/tag (staged), security-auditor referral.
+Status: In Progress — 2026-09-24 remaining-issues batch: shared-Pdfium fix (multi-bind bug), A12 mapping, samples 25/25, both release sizes, perf evidence, CI SHA pins, fuzz harness + smoke runs; default 130/1 + layout 140/1 green. Still open: real-doc corpus, full 24h fuzz, CI execution, commit/tag (staged), security-auditor referral. 2026-09-25 reverify (default profile only): `cargo build --locked` zero warnings; `cargo test --locked` 130 passed, 0 failed, 1 ignored. 130-vs-131 DELTA RESOLVED 2026-09-25: `cargo test --locked -- --list` shows exactly 131 tests total (130 runnable + 1 ignored `write_samples`); the "131 passed" claim was loose shorthand for 131 total — no test missing, no code changed. (`rg` finds 144 `#[test]` attrs repo-wide; the balance is `cfg(feature = "pdf-layout")`-gated.)
 
 # 9. Known Issues
 
@@ -246,6 +246,22 @@ Question: 22 audit flags needed Architect rulings (amend code, amend blueprint, 
 
 Status: Resolved 2026-09-24 by user "fix them all incl. AQ" authorization — documented decisions, blueprint unchanged: FIXED in code (A4 dead `ns` removed; A5 dead `parse_rels` removed; A18 csv caller-opts; A15 %-integer/ms/hyperlink-preserve; A11 flat list/tabular + title-L1 + tests; A17 bool/error test + C12 titles + A7/A8 pins; A13 layout spec-literal edits listed in Session Log). ACCEPTED as-is (A1 unwind; A3 RTF warn; A6 EPUB split; A9 md-Auto; A10 hidden-warning-as-note; A14 raw-Encrypt pre-scan; A19–A22). STILL BLOCKED, no local fix possible: A12 PDFium-refusal mapping, A13 feature-test verification, A16 samples/fuzz/corpus/CI/pdf-layout evidence, A17 five-fixture comparison. A13 edits must be re-verified on the first `--features pdf-layout` CI run with native PDFium before any tag. UPDATE 2026-09-24 remaining-issues batch: network + local chromium/8066 lib unblocked this — A12 mapping implemented and pinned by `layout_encrypted_reports_encrypted`; A13 verified (7 layout unit tests + native OCR e2e green, suite 140/1); shared-Pdfium multi-bind fix verified (order-dependent failures reproduced pre-fix, gone post-fix). Remaining from this set: real-doc corpus, full 24h fuzz (smoke done), CI execution, commit/tag.
 
+## AQ-011 — Asset-namespace length bound (long input filenames)
+
+Blueprint Step: P0-S08 (`convert.rs` staging; "filename = stem + extension" with no length rule).
+
+Question: `src/convert.rs:92` builds the per-file asset namespace as the raw stem for `[A-Za-z0-9_-]`-only stems, else `~` + full hex of the stem bytes — unbounded. A 162-char/164-byte real-world stem (corpus EPUB, strace-proven) yields a 329-byte single path component; `mkdir` fails ENAMETOOLONG (NAME_MAX 255) and the conversion dies with `I/O error: invalid filename`, exit 1. Any stem with non-alphanumeric chars past ~127 bytes is a guaranteed failure. Wanted: truncate (how many bytes, keep readability?), hash-suffix (which hash, collision handling?), or declared-limitation with a clear error naming the limit? Code untouched pending ruling — current behavior is honest (no partial output) but trips on ordinary long ebook filenames.
+
+Status: Resolved 2026-09-25 by user "fix them" authorization — documented decision, blueprint unchanged: new `asset_namespace()` helper (`src/convert.rs`): readable stems pass through, other stems hex-encoded as before, either form capped at 200 bytes; overlong names fall back to `long-<32 readable chars>-<16-hex stem hash>` (deterministic, unique, always ≤54 bytes) + warning "long input filename shortened in asset paths" (pushed before report creation so it surfaces in reports). Pinned by 4 lib unit tests (passthrough/hex/bound/determinism) + e2e `long_stem_shortens_asset_namespace` (150-char stem with image asset → converts, shortened namespace, warning, asset present). Proven on the corpus repro: the 162-char-stem EPUB that died ENAMETOOLONG now exits 0 with md + report + `assets/long-HowtoBecomeanExpertSoftwareEngin-515fffd239d5d28e/image-001.jpg`. Full suite 135/0/1, zero warnings.
+
+## AQ-012 — Empty-yield PDF pages are neither text nor placeholder (silent gap)
+
+Blueprint Steps: P4-S01 (scanned detection), P4-S02 (NeedsOcr placeholders).
+
+Question: Scanned detection flags NeedsOcr only when a page's content stream lacks text-showing operators. sam/ run proves 11 real scanned books (up to 1376 pages, 0 text lines in every output) yield ~1 flagged page each, while hundreds of sibling pages decode to zero text and emit a bare `Boundary(Page)` with no placeholder, no warning, and a report claiming "1 page(s) need OCR". Blank-by-design pages vs image-only pages need different treatment, and the discriminating signal plus the counting rule are unspecified — P4-S02 covers only already-flagged pages. Wanted: extend NeedsOcr to zero-yield non-trivial pages (placeholder + honest count), or declare bare-boundary emission acceptable with blueprint wording? Code untouched pending ruling — current behavior understates loss, which §0.1 forbids.
+
+Status: Resolved 2026-09-25 by user "fix it" authorization — documented decision, blueprint unchanged, two-layer fix in `extract_pdf_flat` (`src/extract/pdf.rs`): (1) zero-yield substantial pages join the scanned set (placeholder + honest count) when attribution is aligned or the whole decode is empty — blank (trivial-stream) pages stay bare; (2) decoded text always wins over the scanned flag — the diag proved why: 478pp novel decoded 808,965 real chars with zero formfeeds, all attributed to page 1, which was operator-absent, so the old branch discarded the entire blob (9KB/0-text output). Pinned by `zero_yield_substantial_page_gets_placeholder` + `blank_page_stays_bare`. Proven: Database (1376pp) went 9KB/0-text/1-scan → 3.47MB real text, 0 placeholders, OCR warning correctly gone, 0 FFFD. Full suite 139/0/1, zero warnings; release 4,310,304 B.
+
 # 12. Security Checklist
 
 - Secrets: N/A — none introduced.
@@ -268,9 +284,23 @@ Status: Resolved 2026-09-24 by user "fix them all incl. AQ" authorization — do
 | Security/adversarial | 27 | 27 |
 | Regression | 27 | 27 |
 
-Latest Test Run: 2026-09-24 — default 130 passed, 0 failed, 1 ignored (samples_gen write test), zero warnings, toolchain 1.98.0. Breakdown: lib 11, bin 1, cli_docs 1, detect 9, e2e 10, model 5, phase0 14, phase1 12, phase2 11, phase3 4, phase4 10, phase5 4, phase6 9, regressions 28, samples_gen 1 (25/25 samples detect). `pdf-layout` profile: 140 passed, 0 failed, 1 ignored with chromium/8066 native lib (7 layout unit + missing-pdfium + native-OCR + layout-encrypted); network restored mid-session so the feature build compiled. Release evidence: default 4,307,648 B (4.11MiB ≤5MB) sha f327a17b; layout 4,147,384 B (3.96MiB) sha 796bd272 (see docs/pdfium-setup.md). Fuzz smoke (nightly + cargo-fuzz 0.13.2, ASan): rtf 247,187 runs/91s, pdf 561,111/91s, csv 39,956/91s — zero crashes; §14 24h/target still open. Perf: 100 mixed files batch exit 0 in 18.3s wall (≪5min gate). CI YAML: 10 combos valid, actions pinned to SHAs (checkout 11bd596a, upload-artifact ea165f8d); workflow never executed (needs vars + runners).
+Latest Test Run: 2026-09-25 — default 139 passed (137 + 2 AQ-012 tests), 0 failed, 1 ignored, zero warnings, toolchain 1.98.0. Release 4,310,304 B (≤5MB). Prior evidence (not re-run today): `pdf-layout` profile 144 tests listed 2026-09-25 via `cargo test --locked --offline --features pdf-layout -- --list` (131 default + 13 layout-gated; pre-shadow-fix claim 140/1 is superseded — 3 shadow/hijack tests added since; execution still needs native PDFium, absent). Release evidence: default 4,307,952 B (4.11MiB ≤5MB); layout 4,188,216 B (3.99MiB) sha `248688cf…` (see docs/pdfium-setup.md). Fuzz smoke (nightly + cargo-fuzz 0.13.2, ASan): rtf 247,187 runs/91s, pdf 561,111/91s, csv 39,956/91s — zero crashes; §14 24h/target still open. Perf: 100 mixed files batch exit 0 in 18.3s wall (≪5min gate). CI YAML: 10 combos valid, actions pinned to SHAs (checkout 11bd596a, upload-artifact ea165f8d); workflow never executed (needs vars + runners). Corpus (11 real PDFs): 11/11 convertible — 8 default-clean (0 U+FFFD) + 3 via layout (Active/app-comb/Automate → md; cover doubling fixed, fragments poppler-confirmed genuine); 0 crashes — see Session Log. 2026-09-25 CI-equivalent local (linux-x86_64 default only): `cargo tree --locked` zero pdfium entries (pdf-extract 0.12.1 + lopdf 0.45/0.42); `cargo build --locked --release` 4,307,952 B within ≤5MB; `package_binary.py default` archive sha `7ba7d9f7…`, lock sha `4573af18…`; cli_docs drift test green (in 130/0/1 suite). Remote 10-combo matrix NOT executed (needs GitHub runners + RUST_TOOLCHAIN/PDFIUM_* vars); pdf-layout NOT re-run (native lib absent — chromium/ dir gone, repo-root .so known-incompatible). Fuzz smoke 2026-09-25 (nightly + cargo-fuzz 0.13.2, ASan, 90s/target): rtf 156,466 runs, pdf 476,309, csv 29,073 — zero crashes, no crash/oom/timeout artifacts; §14 24 CPU-hours/target NOT met (≈0.025 CPU-h each — full runs need ~18 wall-hours on 4 cores, see Session Log for commands).
 
 Coverage: Not measured. All test files executed successfully.
+
+§9-row-to-test mapping (P6-S04 DoD, recorded 2026-09-25; blueprint names `tests/negative_suite.rs` but the suite lives in `tests/regressions.rs` + `tests/phase6_integration.rs` — CLOSED 2026-09-25 by user decision: keep current files, mapping below is the record, blueprint unchanged):
+| §9 row | Test(s) |
+| --- | --- |
+| Malformed/weaponized ZIP | `negative_entrypoints_exact_errors` (truncated.pdf/bad.docx → Corrupt), `zip_case_collisions_are_rejected`, `empty_and_truncated`, `pk_empty_archive_signature_still_zip_branch` |
+| Malformed XML | `deeply_nested_xml_bounded`, `xml_strict_rejects_mismatched_nesting`, `omml_deep_nesting_stays_bounded`, `xml_stream_order_and_cdata` |
+| PDF parser bombs | `encrypted_pdf_exact_error`, `encrypted_pdf_convert_file_fails_without_partial_output`, fuzz_pdf smoke 476k runs zero crashes |
+| Path traversal | `markdown_remote_or_traversing_images_remain_links`, `markdown_local_images_are_embedded_with_safe_paths`, `report_symlink_rejected_before_replacing_output` |
+| Command injection (OCR) | `fake_engine_argv_and_cleanup` (argv array; `eng; echo NOT_A_SHELL` passed literally), `missing_engine_auto_preserves_image_force_errors` |
+| Unbounded memory | `negative_entrypoints_exact_errors` size-guard case (`file exceeds --max-size`) |
+| Output overwrite | `source_overwrite_stays_refused_after_renderer_changes`, `staged_overwrite_replaces_outputs_and_cleans_backups`, `report_conflict_does_not_write_partial_output`, `same_stem_collision_rejected_before_writes_race` |
+| Batch DoS | `strict_one_worker_stops_queue`, `recursive_outputs_mirror_tree_and_isolate_errors`, `cli_batch_exit_codes_and_progress` |
+| pdfium FFI (opt-in) | `missing_pdfium_is_actionable`, `layout_encrypted_reports_encrypted` (feature-gated) |
+| N/A (auth/secrets/replay) | No tests by design — local single-user tool, no network (see Security Checklist) |
 
 Known Failures: None.
 
@@ -282,6 +312,286 @@ Known Failures: None.
 4. Then: initial commit + architecture/security reviews + tag (no tag until §14 evidenced).
 
 # 15. Session Log
+
+## 2026-09-25 — AQ-012 fixed (Orchestrator)
+
+Session Summary: User said "fix it". Root-caused with a temporary instrumented test (since removed): the 478pp book decoded 808,965 real chars ("FATIMA BALA / Broken" novel) with zero formfeeds → all text attributed to operator-absent page 1 → old scanned-branch discarded the blob. Fixed text-wins + zero-yield-placeholder layers (see AQ-012). Full suite green, release rebuilt, Database proof: 9KB/0-text → 3.47MB text.
+
+Completed Steps: diag probe (with_ops=477/478, decoded 808KB/0-FF) → loop rewrite + flagged-set warning count → 2 new tests → temp-test removal → full suite 139/0/1 zero warnings → release 4,310,304 B → Database proof (1376 bounds, 0 scans, 0 FFFD, 1 warning).
+
+Files Created: none (zz_diag.rs created + removed). Files Modified: src/extract/pdf.rs (loop + warning count), tests/phase4_integration.rs (+2 tests), project/agent.md (AQ-012 closed, this log).
+
+Dependencies Added: None.
+
+Tests Executed: full `cargo test --locked` 139 passed, 0 failed, 1 ignored, zero warnings, toolchain 1.98.0.
+
+Security Work: none (extraction logic only; no trust-boundary change).
+
+Important Notes: AQ-012 CLOSED. The 11 sam/ scanned books mostly contain REAL text PDFs misread earlier — several "0-text" outputs will now convert (re-run recommended for corpus numbers). Remaining: 24h fuzz, commit-remainder, reviews, tag. P6-S05 Acceptance Criteria still NOT MET. No commit, no tag (not requested this turn).
+
+Repository Status: main tracks origin/main at 9cc9be1 (+ uncommitted fixes); no tag.
+
+## 2026-09-25 — sam/ PDF run (Orchestrator)
+
+Session Summary: User asked to test the 21 selected PDFs in `sam/`. Converted all with current binaries (debug first: 21.7MB file hit 280s timeout and 2.3MB took 105s — debug-build pdf-extract cost, known; rebuilt release 4,309,504 B with all fixes and reran: 10–20x faster). Outputs to /tmp, then packaged `sam-eval/` (6.2MB + sam.tsv) for user evaluation. No source changes.
+
+Completed Steps: 21/21 attempted → 20 ok, 1 honest Encrypted fail (Computer Vision, password-protected). Textbooks that are real text PDFs superb (CS:APP 1105pp→2.49MB, C++ Wiki 684pp→1.19MB, deeplearningbook 800pp→1.87MB, all 0 FFFD); timetable clean with tabular alignment; only 2 FFFD in the whole run (JavaAndroidStudio). Read 4 outputs directly + placeholder/text-line audit across all 20.
+
+Files Created: sam-eval/ (untracked, user evaluation). Files Modified: project/agent.md (AQ-012, §13, this log). Dependencies Added: None. Tests Executed: none (137/0/1 stands).
+
+Security Work: encrypted file → clean Encrypted error, no partial output.
+
+Findings: GENUINE GAP → AQ-012 (open): 11 scanned books (up to 1376pp, 0 text lines each) yield ~1 NeedsOcr flag each; the rest emit bare page boundaries with no placeholder and the report understates ("1 page(s) need OCR") — silent loss against §0.1; needs Architect signal/counting ruling, code untouched.
+
+Important Notes: P6-S05 Acceptance Criteria still NOT MET (AQ-012 ruling, 24h fuzz, commit-remainder, reviews, tag). No commit, no tag.
+
+Repository Status: main tracks origin/main at 9cc9be1 (+ uncommitted fixes); no tag.
+
+## 2026-09-25 — Quality issues fixed + PDF test (Orchestrator)
+
+Session Summary: User asked to fix quality-eval findings, explain the silent EPUB, and add a PDF test. Three items, one pass. No architecture change.
+
+Completed Steps: (1) SILENT EPUB VERDICT — the `.epub.pdf` file is 211,536 bytes of pure NUL (verified every byte); rerun exits 1 with typed Unsupported + mismatch note and writes zero files. Correct behavior — a zeroed download has nothing to convert; no product change. (2) `[]()` FIX — empty-target `Inline::Link` now renders bare children in both renderers (`markdown.rs`, `txt.rs` "text ()" variant fixed too); pinned by `empty_link_target_renders_bare_text` (phase0). (3) PDF TEST — `zeroed_bytes_rejected_honestly` (phase4): zeroed `.pdf` → Unknown + mismatch note → Unsupported "no recognizable signature", no partial outputs.
+
+Files Created: none. Files Modified: src/render/markdown.rs, src/render/txt.rs (1 line each), tests/phase0.rs, tests/phase4_integration.rs (+1 test each), project/agent.md (this log).
+
+Dependencies Added: None.
+
+Tests Executed: full `cargo test --locked` 137 passed (135 + 2 new), 0 failed, 1 ignored, zero warnings, toolchain 1.98.0.
+
+Security Work: none (renderer fallback + tests only).
+
+Important Notes: P6-S05 Acceptance Criteria still NOT MET (24h fuzz, commit-remainder, reviews, tag). No commit, no tag (not requested this turn).
+
+Repository Status: main tracks origin/main at 9cc9be1 (+ uncommitted fixes); no tag.
+
+## 2026-09-25 — Random quality sample (Orchestrator)
+
+Session Summary: User asked for 5 seeded-random files per type (PDF excluded) with output-quality judgment. Seed 20260925, post-fix debug binary, outputs to /tmp. 23/35 converted; all 12 failures in already-root-caused honest classes (zeroed stubs, legacy .ppt OLE2, IRM stub, generic XML). No source changes.
+
+Completed Steps: sampled 35 (lists in /tmp/quality-sample.json) → converted → signal pass (sizes/headings/tables/images/FFFD/warnings) → read 8 outputs directly + source-checked 2 suspicions.
+
+Files Created/Modified: project/agent.md (this log). Dependencies Added: None. Tests Executed: none (135/0/1 stands).
+
+Quality verdict (convertibles): docx DESIGN rich doc excellent (104 headings, tables, 8 images); Full Stack EPUB superb (1.47MB md, ~3k headings, 671 images, cover alt-text); flat-source EPUB faithfully flat (source has ~1 h-tag per 8 chapters — verified in the ZIP, not dropped); PPTX deck excellent (slide headings, 18 positioned images, bullets); xlsx tables byte-sound incl. formulas path; html/odt clean with auto-selection working both directions (novels→txt, rich→md). Zero U+FFFD in every output. Misnamed scanned-PDFs correctly surfaced as ScannedPage placeholders. Cosmetic wart noted (not fixed): empty-target link renders as `[]()` (How-to-Become head) — Architect may rule bare-text fallback.
+
+Important Notes: P6-S05 Acceptance Criteria still NOT MET (24h fuzz, commit-remainder, reviews, tag). No commit, no tag.
+
+Repository Status: main tracks origin/main at 9cc9be1 (+ uncommitted AQ-011 fix); no tag.
+
+## 2026-09-25 — AQ-011 fixed (Orchestrator)
+
+Session Summary: User said "fix them". The only genuine code defect in the open set was AQ-011 (everything else: honest behaviors, env-gated evidence, or already closed). Fixed + pinned + proven. One process slip caught and repaired mid-step (helper insert briefly displaced the `convert_file` signature line; restored immediately, verified by read + green build).
+
+Completed Steps: extracted `asset_namespace()` helper with 200-byte cap + `long-<prefix>-<hash>` fallback + pre-report warning; 4 lib unit tests; e2e `long_stem_shortens_asset_namespace`; full suite green; corpus-repro proof (exit 0, asset under shortened namespace).
+
+Files Created: none. Files Modified: src/convert.rs (helper + call-site + tests), tests/e2e.rs (+1 test), project/agent.md (AQ-011 closed, this log).
+
+Dependencies Added: None.
+
+Tests Executed: full `cargo test --locked` 135 passed (130 + 4 unit + 1 e2e), 0 failed, 1 ignored, zero warnings, toolchain 1.98.0. (Mid-step: 1 self-authored unit test initially asserted shortening for a 66-char stem that correctly does not trigger — test string fixed, code was right.)
+
+Security Work: none new (naming bound only; no trust-boundary change).
+
+Important Notes: AQ-011 CLOSED. Remaining: 24h fuzz, full PDF sweep (optional), commit-remainder, reviews, tag. P6-S05 Acceptance Criteria still NOT MET. No commit, no tag (not requested this turn).
+
+Repository Status: main tracks origin/main at 9cc9be1 (+ uncommitted fix); no tag.
+
+## 2026-09-25 — Ebooks corpus run (Orchestrator)
+
+Session Summary: User pointed at `./Ebooks/*` (8 format dirs, 1771 files / 5.6G). Rebuilt release binary (ocr.rs attribute only — same 4,307,952 B), converted all 359 non-PDF files + stratified PDF subset (25 smallest + 10 largest of 1412), outputs to /tmp (repo clean). No source behavior changed except 5 fuzz-seed copies.
+
+Completed Steps: release rebuild; non-PDF batch (225/359 ok); PDF subset (29/35 ok, 3.4MB text, 0 U+FFFD); per-class failure root-causing (magic-byte + message + strace probes); 5 tiny real PDFs seeded to `fuzz/corpus/fuzz_pdf/` (18→23); agent.md evidence (§13), new AQ-011, this log.
+
+Files Created: none in repo (fuzz seeds on disk; /tmp outputs). Files Modified: project/agent.md only. Dependencies Added: None. Tests Executed: none (130/0/1 stands).
+
+Security Work: hostile/garbage inputs produced typed errors only — no crash, no partial output; real dependency panic contained (see below).
+
+Findings: (1) All non-timeout failures are honest: AD-5 legacy stubs, zeroed/garbage/misplaced inputs with mismatch notes, IRM stubs not misdetected, generic-XML Unknown (no xml.rs step exists — recorded gap), misplaced ZIP noted. (2) 3 perf timeouts (>90s: 2×10MB font-dense PDFs, 1×21MB EPUB) — §14-batch watch items. (3) P4-S01 containment PROVEN on real input: pdf-extract panicked (`missing unicode map and encoding`, Handbook PDF) → hook printed, unwind caught, typed Corrupt, exit 1. (4) GENUINE BUG → AQ-011: 162-char stem → 329-byte hex namespace → ENAMETOOLONG → `I/O error: invalid filename`; needs Architect naming-policy ruling, code untouched.
+
+Important Notes: §14 corpus bar (≥20/format) now has: docx 134, epub 3, html 7, odt 10, pdf 29+11 prior, pptx 50, xlsx 21, xml 0-convertible — epub/html/odt/xml short or structurally unconvertible; full 1412-PDF sweep + 24h fuzz + commit-remainder + reviews + tag still pending. P6-S05 Acceptance Criteria still NOT MET. No commit, no tag.
+
+Repository Status: main tracks origin/main at 9cc9be1; no tag.
+
+## 2026-09-25 — CI green report + fuzz/corpus plan (Orchestrator)
+
+Session Summary: User reports remote CI all green (Windows fix confirmed by re-run; run log not inspected here — recorded as user-reported). Asked whether GitHub can do the 24h fuzz + pointed at corpus `ebooks/*` (not present in this workspace — environment restores non-repo files between turns; `pdf/` from the prior corpus run is also gone).
+
+Completed Steps: verified GitHub job limits against live docs (hosted 6h/job, self-hosted 5 days/job); designed two fuzz-on-GitHub options (see log); no code changed.
+
+Files Created/Modified: project/agent.md (this log). Dependencies Added: None. Tests Executed: none.
+
+Important Notes: (a) Single 24h fuzz job is IMPOSSIBLE on GitHub-hosted runners (6h hard cap) — needs 4×6h chained runs/target with corpus artifacts, or one self-hosted-runner job (5-day cap). (b) Fuzz minutes cost: 3 targets × 24h = 72h wall ≈ 4320+ billed minutes — exceeds the 2000 free-minutes tier; needs paid minutes or self-hosted. (c) Corpus: awaiting user placing `ebooks/` at a workspace path — then run per-file conversions + seed fuzz corpus in-session. P6-S05 Acceptance Criteria still NOT MET (fuzz hours, commit-remainder, reviews, tag). No commit, no tag.
+
+Repository Status: main tracks origin/main at 9cc9be1; no tag.
+
+## 2026-09-25 — Fix committed + pushed (Orchestrator)
+
+Session Summary: User said "git add commit and push on the fix". Committed scoped to the fix only (`.gitattributes` + `src/ocr.rs`, 7 insertions/1 deletion — staged diff reviewed before commit) and pushed. Pre-existing user commits found on arrival (branch is `main`, not `master`; first commit + actions-SHA fix already in). No code changed in this step.
+
+Completed Steps: `git add` (2 paths) → staged-diff review → `git commit` (`9cc9be1`) → `git push -u origin main` (`85e4f22..9cc9be1`, tracking set).
+
+Files Created/Modified: none beyond the commit itself. Dependencies Added: None. Tests Executed: none (130/0/1 stands).
+
+Important Notes: Push went to `main` (initial `master` push failed — branch is `main`; corrected, no force). Next: re-run Windows CI job on a fresh checkout; then fuzz/commit-remainder/reviews/tag per ci-setup guide. P6-S05 Acceptance Criteria still NOT MET. No tag.
+
+Repository Status: main tracks origin/main at 9cc9be1; no tag.
+
+## 2026-09-25 — Windows CI failures root-caused + fixed (Orchestrator)
+
+Session Summary: User reported remote CI: all OS green except Windows (2 golden failures + 1 warning; log pasted). Two findings, both fixed in one pass. No architecture change.
+
+Completed Steps: (1) GOLDENS — `markdown_golden`/`txt_golden` compare renderer output byte-exact against `include_str!("golden/basic.md|txt")`. Windows checkout converts LF→CRLF, so the file side carried `\r\n` while the renderer correctly emits `\n` (P0-S07). Reproduced byte-identically locally by CRLF-converting the goldens (same left/right, same 2 tests), then restored (SHA-verified identical). Fix: new `.gitattributes` pinning `eol=lf` for `tests/golden/*` (+ `*.rs`); `git check-attr` confirms. Other `include_str!` users are immune (`prose_pdf_decodes` trims, `cli_docs` uses `.lines()`). Fix is checkout-time: needs a fresh Windows CI run to confirm (no Windows host here). (2) WARNING — `src/ocr.rs:10` `let mut b`: `mut` only used inside `#[cfg(unix)]`, so Windows lints `unused_mut` (project standard: zero warnings). Fix: `#[allow(unused_mut)]` on that statement — behavior-neutral on all platforms.
+
+Files Created: .gitattributes (new, uncommitted).
+
+Files Modified: src/ocr.rs (1 attribute), tests/golden/* (temporarily CRLF for repro, restored byte-identical — SHAs `444117fb…`, `192eda43…` match), project/agent.md (this log).
+
+Dependencies Added: None.
+
+Tests Executed: repro run (2 failed as on Windows, byte-identical); after fix `cargo build --locked` zero warnings + full `cargo test --locked` 130 passed, 0 failed, 1 ignored, toolchain 1.98.0.
+
+Security Work: none (test-line-endings + lint allow; no behavior change).
+
+Important Notes: Windows CI must be re-run (fresh checkout picks up .gitattributes). P6-S05 Acceptance Criteria still NOT MET (remote CI confirmation, 24h fuzz, commit, reviews, tag). No commit, no tag.
+
+Repository Status: master, no commits yet; no tag.
+
+## 2026-09-25 — CI-ready + user guide (Orchestrator)
+
+Session Summary: User said "proceed with CI and guide for user if user action is required". Did everything executable locally; wrote `docs/ci-setup.md` (explicitly requested) for the rest. No source, test, or config behavior changed.
+
+Completed Steps: (1) Reviewed `scripts/fetch_pdfium.py` against `skills/ci.md`/`packaging.md` — conformant as-is (https-only URL, 64-hex SHA required, 250MB fetch cap, SHA verified pre-use, exactly-one bounded library member for zip+tar, fixed output name so no zip-slip, fails closed). No hardening change needed. (2) Confirmed `docs/pdfium-setup.md` already documents CI Variables per platform + the one verified Linux-x64 instance (no invented provenance). (3) Created `docs/ci-setup.md`: local pre-flight record, remote+push steps, Variables table, runner check, result-reading rules, full 24h fuzz commands, reviews-then-tag order.
+
+Files Created: docs/ci-setup.md (new, uncommitted).
+
+Files Modified: project/agent.md (this log).
+
+Dependencies Added: None.
+
+Tests Executed: none (no code changed; 130/0/1 + fuzz smoke stand).
+
+Security Work: none new; fetch-script review recorded above; security-auditor.md referral still open.
+
+Important Notes: Remote CI execution, full fuzz, commit/push, reviews, tag all still require user action per the new guide. P6-S05 Acceptance Criteria still NOT MET. No commit, no tag.
+
+Repository Status: master, no commits yet; docs/ci-setup.md untracked; no tag.
+
+## 2026-09-25 — CI/minor/tag triage (Orchestrator)
+
+Session Summary: User said "proceed with all of CI and minor and the tag". Investigated actionability before touching anything. No source, test, doc, or config files changed — agent.md only.
+
+Completed Steps: (1) CI feasibility probe: no git remote configured, no `gh` CLI, no RUST_TOOLCHAIN/PDFIUM_* vars, no push authorization — remote 10-combo execution is environment-blocked, recorded below, not attempted. (2) MINOR closed: user chose keep-current-files for the `negative_suite.rs` naming drift (mapping in §13 stands as the record, blueprint unchanged). (3) TAG declined with reasons (see Important Notes) — tagging now would violate Completion Rules + packaging skill.
+
+Files Created/Modified: project/agent.md only. Dependencies Added: None. Tests Executed: none (130/0/1 + fuzz smoke stand).
+
+Security Work: none; security-auditor.md referral still open.
+
+Problems Encountered: remote CI + tag blocked (environment/evidence gates, not code findings).
+
+Important Notes: Tag REFUSED — §14 gates unmet: remote CI never executed, fuzz at 90s/target (not 24h), no commit, architecture/security reviews open. To unblock, in order: (a) `git remote add origin <url>` + auth + set RUST_TOOLCHAIN/PDFIUM_URL_*/PDFIUM_SHA256_* vars from reviewed provenance; (b) say "commit" (explicit) then push to trigger the matrix; (c) full 24h fuzz; (d) run release-auditor + security-auditor roles; (e) tag only when agent.md §14 is fully evidenced. P6-S05 Acceptance Criteria still NOT MET. No commit, no tag.
+
+Repository Status: master, no commits yet; no tag.
+
+## 2026-09-25 — (h), CI matrix, minor items (Orchestrator)
+
+Session Summary: User said "proceed with h, CI matrix, minor open items". Worked all three single-step, in order. No source behavior changed — agent.md state + verification runs only.
+
+Completed Steps: (1) MINOR — 130-vs-131 delta resolved (`-- --list` = 131 total: 130 runnable + 1 ignored; "131 passed" was shorthand). (2) MINOR — §9-row-to-test mapping recorded in §13 (P6-S04 DoD item; `tests/negative_suite.rs` filename drift flagged, behavior covered by regressions.rs + phase6). (3) (h) DONE by user-authorized documented decision, blueprint unchanged: `samples()` = one generatable sample per blueprint-referenced input type (25/25 detecting, pinned by `generated_samples_have_recognized_signatures`); per-scenario fixtures are generated at test time by `tests/common/` builders (zip/png/docx/epub/odt/pptx/xlsx/ods/xls/pdf_streams/zip_patch/fake_ocr) + inline code; audit outcome — zero binary fixtures committed (`tests/fixtures/fake-ocr/main.rs` is source compiled at test time; `tests/golden/` is text), so every phase's tests are reproducible from source per P6-S05 instruction 7. `write_samples` (ignored) materializes `samples/generated` on user demand. (4) CI MATRIX partial: workflow YAML parses (5 platforms × 2 profiles = 10 combos, `contents: read` least-privilege); `cargo check --locked --offline --features pdf-layout` green (dev); layout `-- --list` = 144 tests (131 + 13 gated). Remote execution on runners + layout test execution (native lib absent) + full 24h fuzz still pending.
+
+Files Created: None (release-artifacts/ from prior step left on disk, uncommitted).
+
+Files Modified: project/agent.md (this log, §8 Next Step, §13 layout note + §9 mapping, 130/131 resolution).
+
+Dependencies Added: None.
+
+Tests Executed: no suite re-run (130/0/1 stands from earlier today); `-- --list` counts only (default 131, layout 144); fuzz smoke stands (3×90s zero crashes).
+
+Security Work: none new; security-auditor.md referral still open.
+
+Problems Encountered: remote CI + full fuzz + reviews/commit/tag remain environment/authority-gated, not code findings.
+
+Important Notes: P6-S05 Acceptance Criteria still NOT MET (needs remote CI green, 24h fuzz, commit, reviews, tag). No commit (not explicitly requested), no tag.
+
+Repository Status: master, no commits yet; no tag.
+
+## 2026-09-25 — CI-equivalent + fuzz smoke (Orchestrator)
+
+Session Summary: User said "proceed with CI execution, 24 fuzz". Full GitHub matrix (10 combos) cannot run locally — no remote runners/vars; full 24 CPU-hours/target (≈18 wall-hours on 4 cores) cannot complete in-session. Executed the honest subset: local CI-equivalent for linux-x86_64 default + 90s ASan smoke per fuzz target. No source, test, doc, or config files changed — agent.md + release-artifacts/ outputs only.
+
+Completed Steps: `cargo tree --locked` (0 pdfium); `cargo build --locked --release` (4,307,952 B); `package_binary.py default` (archive `7ba7d9f7…`); `cargo +nightly fuzz run fuzz_{rtf,pdf,csv} -- -max_total_time=90` (156,466 / 476,309 / 29,073 runs, zero crashes, no crash/oom/timeout artifacts).
+
+Files Created: release-artifacts/docconvert-linux-x86_64-default.{tar.gz,json} (local only, not committed).
+
+Files Modified: project/agent.md (this log + §13 evidence).
+
+Dependencies Added: None.
+
+Tests Executed: CI-equivalent checks above + prior 130/0/1 suite (reused, not re-run); fuzz smoke 3×90s as above.
+
+Security Work: none new; fuzz smoke is regression signal only, not §14 evidence; security-auditor.md referral still open.
+
+Problems Encountered: remote CI matrix + pdf-layout re-run + full 24h fuzz all still pending (environment/RFC limits, not code findings).
+
+Important Notes: Full-fuzz commands for user/CI (from fuzz/: `cargo +nightly fuzz run fuzz_rtf -- -max_total_time=86400`, same for fuzz_pdf/fuzz_csv — one target at a time; each ≈24 wall-hours single-worker, or parallelize across cores/hosts and sum CPU-hours from `stat::` lines; stop on first crash artifact and file it before continuing). Fuzz seeds: 5 tiny real PDFs from Ebooks/ added to `fuzz/corpus/fuzz_pdf/` (18→23; rtf 2292, csv 587 from prior runs).
+
+Corpus run 2026-09-25 (`Ebooks/`, 1771 files / 5.6G: docx 190, epub 6, html 7, odt 10, pdf 1412, pptx 101, xlsx 35, xml 10; release binary rebuilt same-day 4,307,952 B; outputs to /tmp, repo clean): converted all non-PDF (359 files: 225 ok) + stratified PDF subset (25 smallest + 10 largest: 29/35 ok, 3.4MB text, **0 U+FFFD**). Zero process crashes, zero partial outputs. Failure classes (each root-caused, none a silent loss): legacy OLE2 DOC/PPT → AD-5 detect-and-report; zero-filled / garbage / misplaced-extension inputs → honest Unknown + mismatch notes; IRM stubs (MsoIrmProtector) → Unknown, not misdetected as OLE2/BIFF; generic XML → Unknown (xml.rs never built — arch-table Extended item with no blueprint step, recorded gap); misplaced ZIP → "without recognizable document structure"; 3 TIMEOUTs (>90s: 2×10MB font-dense PDFs, 1×21MB EPUB — perf outliers, §14-batch watch item). Real-dependency panic contained: `pdf-extract 0.12.1` panicked (`missing unicode map and encoding`) on `Electrical Engineering Handbook.pdf` — panic-hook line on stderr, unwind caught per P4-S01, typed `Corrupt` error, exit 1, no partial output. Genuine bug found: AQ-011 (long-stem asset-namespace exceeds NAME_MAX — see Architect Questions).
+
+Repository Status: master, no commits yet; release-artifacts/ + fuzz corpus updates on disk, uncommitted; no tag.
+
+## 2026-09-25 — P6-S05 verification re-run (Orchestrator)
+
+Session Summary: User said "proceed". (h) samples_gen enumeration remains Architect-blocked, so no code handoff. Ran the single executable verification step instead: default-profile build + full test suite, then updated state. No source, test, doc, or config files changed — agent.md only.
+
+Completed Steps: `cargo build --locked` (clean, zero warnings); `cargo test --locked` (130 passed, 0 failed, 1 ignored); agent.md state update (§§header/Current Status/8/13 + this log).
+
+Files Created: None.
+
+Files Modified: project/agent.md (state only).
+
+Dependencies Added: None.
+
+Tests Executed: full default suite 130/0/1, toolchain 1.98.0, zero warnings. Per-binary: lib 11, main 1, cli_docs 1, detect 9, e2e 10, model 5, phase0 14, phase1 12, phase2 11, phase3 4, phase4 10, phase5 4, phase6 9, regressions 28, samples_gen 1 (+1 ignored write test), doc-tests 0. Note: one fewer passed than the 131 claimed 2026-09-24; no `tests/negative_suite.rs` binary exists (blueprint P6-S04 names it; adversarial coverage currently lives in regressions.rs + phase6) — recorded, not resolved here.
+
+Security Work: none new; security-auditor.md referral still open.
+
+Problems Encountered: 130 vs prior 131 delta (under investigation); (h) still blocked on Architect fixture list; §14 evidence (corpus, 24h fuzz, CI execution, commit/tag) still pending.
+
+Important Notes: P6-S05 Acceptance Criteria still NOT MET. No commit (not explicitly requested). No tag.
+
+Repository Status: master, no commits yet, working tree matches prior staged state plus this agent.md edit; no tag.
+
+## 2026-09-24 — Layout quality fixes on corpus (Orchestrator)
+
+Session Summary: User asked why Automate layout output was poor ("AAUUTTOOMMAATTEE"). Root-caused with a throwaway pdfium probe (since removed): InDesign double-draws display type — title shadow at systematic offset (dx=1.96, dy=2.00 @40pt), subtitles at (0.74, 0.52) @12pt. Fixed in two layers: `dedupe_glyphs` tolerance 0.5→1.0pt (legit advances run 3pt+; verified safe) + `drop_shadows` size bar 18→10pt with multi-bin loop (first version applied only the top bin, so title shadows masked subtitle shadows; decoy bins like dotted leaders are skipped via the >=3-distinct-chars guard, pinned by a hijack unit test). Verified: Automate cover now reads AUTOMATE / LEARN PYTHON. / GET STUFF DONE. / THE BORING STUFF; leftover fragments ("AA", "SU WITH PYTHON") confirmed genuine cover ornament via poppler (same scattered words). 575/588 code-block warnings are legitimate (programming book). Suites: default 131/1, layout 144/1, zero warnings. Release re-measured: layout 4,188,216 B sha `248688cf…` (repackaged); default 4,307,952 B unchanged. Corpus now 11/11 convertible (8 default + 3 layout).
+
+Completed Steps: glyph probe → dedupe 1.0 → shadow multi-bin + 10pt bar → hijack/two-layer unit tests → shadow e2e test → release rebuilds → cover verified → both suites green.
+
+Files Modified: src/extract/pdf_layout.rs, tests/phase4_integration.rs (+`shadow_double_draw_renders_once`), project/agent.md, project/agent-archive.md, docs/pdfium-setup.md (sizes).
+
+Dependencies Added: None.
+
+Tests Executed: default 131/1; feature 144/1 (chromium/8066 lib).
+
+Security Work: none new; security-auditor.md referral still open.
+
+Repository Status: Fully staged but UNCOMMITTED per user decision ("No commit"); no tag.
+
+## 2026-09-24 — Real-PDF corpus run (Orchestrator)
+
+Session Summary: Ran the user-supplied `pdf/` corpus (11 real PDFs, 1.1–17.8MB: textbooks, manual, paper chapter) through the default release binary, one file per convert call, `timeout 280` each, outputs to /tmp (repo left clean). Result: **8/11 converted** (all auto-selected `.txt`, 11.7MB total text, **zero U+FFFD** in every output; spot-checks show clean headings, page boundaries, Unicode). **3 honest typed failures, zero crashes, zero partial outputs:** Active Calculus + app-comb-2017 → `Corrupt("PDF text could not be decoded")` (pdf-extract defeat on odd/compressed fonts; containment path working as designed); Automate (17.8MB, 510pp) → `Corrupt("PDF structure could not be loaded")` (lopdf xref limit, 0.5s). Layout spot-check (chromium/8066 lib, before binary revert): 19-page academic chapter in 5.4s → 4 tables + 12 dimensioned images + unruled-table warning. Observations: (a) earlier Trigonometry slowness was DEBUG-build pdf-extract cost — release converts it in 10.8s; layout preview on it exceeded 5min (font-dense doc; layout-perf caveat recorded). (b) Wall ≈ 2× user CPU on every file (fsync-heavy environment, not product-bound). (c) Environment restores files between turns (repo-root .so and stray pdf/ outputs seen earlier were gone; layout release binary reverted to default) — measurements below were live at capture time. Corpus verdict: honest-success/honest-failure on real docs; scanned/odd-font PDFs remain layout+OCR territory (needs tesseract, absent here).
+
+Completed Steps: corpus run (8 ok + 3 typed-error), layout chapter spot-check, quality spot-checks.
+
+Files Modified: project/agent.md, project/agent-archive.md (outputs in /tmp only).
+
+Dependencies Added: None.
+
+Tests Executed: None new (evidence run, not a code change); suites still default 130/1, layout 140/1.
+
+Security Work: hostile/complex PDFs produced typed errors only — no crash, no partial write; security-auditor.md referral still open.
+
+Repository Status: Fully staged but UNCOMMITTED per user decision ("No commit"); no tag.
 
 ## 2026-09-24 — Remaining-issues batch (Orchestrator)
 
@@ -297,7 +607,7 @@ Tests Executed: default 130/1; feature 140/1 (PDFIUM_DYNAMIC_LIB_PATH=chromium/8
 
 Security Work: no new trust boundaries; stale incompatible .so flagged (not deleted — user's file); security-auditor.md referral still open.
 
-Repository Status: Staged for initial commit (libpdfium.so + package.json + pdf/ left untracked); no tag.
+Repository Status: Fully staged but UNCOMMITTED per user decision ("No commit"); no tag. libpdfium.so + package.json + pdf/ left untracked.
 
 ## 2026-09-24 — User "fix them all incl. AQ" batch (Orchestrator)
 

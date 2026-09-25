@@ -80,16 +80,31 @@ fn write_outputs(outputs:&[(PathBuf,Vec<u8>)],overwrite:bool)->Result<()>{
     for file in &mut staged{if let Some(backup)=file.backup.take(){if fs::remove_file(&backup).is_err(){return Err(ConvertError::Output("output committed but recovery-backup cleanup failed; preserve .docconvert-backup-* files".into()))}}}
     Ok(())
 }
+/// Asset subdirectory for one input stem. Readable stems pass through; anything
+/// else is hex-encoded. Either form is capped so the result always fits in a
+/// single path component (AQ-011: an uncapped `~hex` encoding of a 164-byte stem
+/// produced 329 bytes and failed with ENAMETOOLONG). Overlong names fall back to
+/// a readable prefix plus a stem hash; the report manifest keeps full traceability.
+fn asset_namespace(stem:&str)->(String,bool){
+    let raw=if stem.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'-'||b==b'_'){stem.to_owned()}else{format!("~{}",stem.as_bytes().iter().map(|b|format!("{b:02x}")).collect::<String>())};
+    if raw.len()<=200{(raw,false)}else{
+        use std::collections::hash_map::DefaultHasher;use std::hash::{Hash,Hasher};
+        let mut hasher=DefaultHasher::new();stem.hash(&mut hasher);
+        let short:String=stem.chars().filter(|c|c.is_ascii_alphanumeric()||*c=='-'||*c=='_').take(32).collect();
+        (format!("long-{short}-{h:016x}",h=hasher.finish()),true)
+    }
+}
 pub fn convert_file(path:&Path,opts:&Options)->Result<Report>{
     let started=std::time::Instant::now();let(detection,mut doc,format,reason)=load(path,opts,true)?;
     let dir=opts.output.clone().unwrap_or_else(||path.parent().unwrap_or(Path::new(".")).to_path_buf());
     let stem=path.file_stem().and_then(|s|s.to_str()).unwrap_or("document");
+    let(namespace,shortened)=asset_namespace(stem);
+    if shortened{doc.warnings.push("long input filename shortened in asset paths; outputs keep the full name".into())}
     let destination=dir.join(format!("{stem}.{}",format.ext()));
     let mut report=Report::from_document(&doc,&detection,format,reason,opts);
     if destination.exists()&&!opts.overwrite{report.status="skipped (output exists)".into();return Ok(report)}
     if destination.exists()&&destination.canonicalize()?==path.canonicalize()?{return Err(ConvertError::Output("refusing to overwrite the source document; select another output directory".into()))}
     if dir.is_symlink(){return Err(ConvertError::Output("output directory is a symbolic link".into()))}
-    let namespace=if stem.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'-'||b==b'_'){stem.to_owned()}else{format!("~{}",stem.as_bytes().iter().map(|b|format!("{b:02x}")).collect::<String>())};
     let asset_dir=dir.join("assets").join(&namespace);
     if dir.join("assets").is_symlink()||asset_dir.is_symlink(){return Err(ConvertError::Output("asset directory is a symbolic link".into()))}
     for asset in &mut doc.assets{asset.rel_path=format!("assets/{namespace}/{}",asset.filename)}
@@ -122,3 +137,11 @@ pub fn explicit_markdown_options()->Options{Options{format_choice:FormatChoice::
 
 // Blueprint-compatible library entry points.
 pub use crate::batch::{expand_inputs,convert_batch,BatchResult};
+
+#[cfg(test)]mod tests{
+    use super::asset_namespace;
+    #[test]fn namespace_readable_passthrough(){assert_eq!(asset_namespace("report-2024_final"),("report-2024_final".into(),false))}
+    #[test]fn namespace_hex_short_kept(){let(ns,short)=asset_namespace("a b");assert!(!short);assert!(ns.starts_with('~'))}
+    #[test]fn namespace_long_bounded(){let stem="word ".repeat(30);let(ns,short)=asset_namespace(&stem);assert!(short);assert!(ns.starts_with("long-"));assert!(ns.len()<=200);assert_eq!(asset_namespace(&stem).0,ns)}
+    #[test]fn namespace_corpus_case_bounded(){let base="How to Become an Expert Software Engineer (and Get Any Job You Want)";let stem=format!("{base} {base}");let(ns,short)=asset_namespace(&stem);assert!(short);assert!(ns.len()<=200)}
+}

@@ -27,7 +27,18 @@ fn decode_whole(bytes:&[u8])->Result<String>{
     let outcome=std::panic::catch_unwind(||pdf_extract::extract_text_from_mem(bytes));
     match outcome{
         Ok(Ok(text))=>Ok(text),
-        Ok(Err(_))|Err(_)=>Err(ConvertError::Corrupt("PDF text could not be decoded".into())),
+        // A returned Err keeps the blueprint-pinned message verbatim. A caught
+        // panic additionally forwards pdf-extract's own message (usually the exact
+        // font-table edge hit, e.g. "missing unicode map and encoding") plus the
+        // upgrade path — a generic message on valid files like XeTeX/pdflatex
+        // output hid the cause and the remedy (user-authorized finding fix).
+        Ok(Err(_))=>Err(ConvertError::Corrupt("PDF text could not be decoded".into())),
+        Err(payload)=>{
+            let detail=payload.downcast_ref::<&str>().copied()
+                .or_else(||payload.downcast_ref::<String>().map(String::as_str))
+                .unwrap_or("unwinding decoder failure");
+            Err(ConvertError::Corrupt(format!("PDF text could not be decoded ({detail}); rebuild with --features pdf-layout for full decoding")))
+        }
     }
 }
 fn has_text_ops(stream:&[u8])->bool{
@@ -63,25 +74,43 @@ pub fn extract_pdf_flat(bytes:&[u8],ctx:&mut ExtractCtx<'_>)->Result<Document>{
         if total>200*1024*1024{return Err(ConvertError::Corrupt("PDF total content limit exceeded".into()))}
         fetched.push((*number,stream));
     }
-    let mut scanned=HashSet::new();
+    let mut scanned=HashSet::new();let mut substantial=HashSet::new();
     for(number,stream)in &fetched{
-        if !has_text_ops(stream)&&stream.iter().filter(|b|!b.is_ascii_whitespace()).count()>8{scanned.insert(*number);}
+        if stream.iter().filter(|b|!b.is_ascii_whitespace()).count()>8{
+            substantial.insert(*number);
+            if !has_text_ops(stream){scanned.insert(*number);}
+        }
     }
     let attr = attribute_pages(&decoded, fetched.len());
+    // AQ-012: per-page text is only trustworthy when the form-feed split matches
+    // the page tree (aligned). A page whose attributed text is empty but whose
+    // content is substantial yielded nothing decodable — same honest signal as
+    // operator absence — unless attribution itself is unaligned AND other pages
+    // did yield text (then the text may belong to this page and sit on page 1).
+    // Genuinely blank pages (trivial streams) stay bare boundaries either way.
+    // Decoded text always wins over the scanned flag: a flagged page carrying
+    // attributed text (notably page 1 under non-aligned attribution, which holds
+    // the whole document's decode) must emit it — flagging it instead silently
+    // discards the only text the document yielded (observed: 808KB dropped).
+    let aligned=decoded.split('\x0c').count()==fetched.len()&&!fetched.is_empty();
+    let total_yield=!decoded.trim().is_empty();
     let title = doc.meta.title.clone();
+    let mut flagged=HashSet::new();
     for(i,(number,_))in fetched.iter().enumerate(){
         doc.blocks.push(Block::Boundary(Boundary::Page(*number as usize)));
-        if scanned.contains(number){
-            doc.blocks.push(scanned_block(*number as usize));
-        }else{
-            let text = attr[i];
-            if !text.trim().is_empty(){doc.blocks.extend(flat_blocks(text,title.as_deref()))}
+        let text = attr[i];
+        if !text.trim().is_empty(){doc.blocks.extend(flat_blocks(text,title.as_deref()))}
+        else{
+            if scanned.contains(number)||(substantial.contains(number)&&(aligned||!total_yield)){
+                flagged.insert(*number);
+                doc.blocks.push(scanned_block(*number as usize));
+            }
         }
     }
     // P5-S03/AD-15: default build has no rasterizer (only pdfium can bitmap a page),
     // so scanned pages stay Placeholder under ANY --ocr mode (Off/Auto/Force) with
     // the explicit OCR_BUILD warning when OCR was requested — never fatal, never silent.
-    if !scanned.is_empty(){doc.warnings.push(format!("{} PDF page(s) need OCR",scanned.len()));if ctx.options.ocr_mode!=OcrMode::Off{doc.warnings.push(OCR_BUILD.into())}}
+    if !flagged.is_empty(){doc.warnings.push(format!("{} PDF page(s) need OCR",flagged.len()));if ctx.options.ocr_mode!=OcrMode::Off{doc.warnings.push(OCR_BUILD.into())}}
     Ok(doc)
 }
 pub(crate) fn scanned_block(n:usize)->Block{Block::Placeholder{kind:PlaceholderKind::ScannedPage,label:Some(format!("page {n}")),asset:None}}
