@@ -1,0 +1,9 @@
+/target
+*.tmp
+node_modules/
+libpdfium.so
+
+/native/
+/release-artifacts/
+/samples/generated/
+/dependency-tree*.txt

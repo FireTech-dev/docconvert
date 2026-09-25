@@ -1,0 +1,2 @@
+// Source-only portable fake engine. Tests compile this using the user's rustc.
+fn main(){let args:Vec<_>=std::env::args_os().skip(1).collect();if args.len()!=4||args[2]!="-l"{std::process::exit(3)}if args[3]=="fail"{eprintln!("fixture failure");std::process::exit(9)}let parent=std::path::Path::new(&args[0]).parent().unwrap();let text=format!("OCR fixture text\nScratch: {}\nLanguage: {}",parent.display(),args[3].to_string_lossy());std::fs::write(std::path::Path::new(&args[1]).with_extension("txt"),text).unwrap();}

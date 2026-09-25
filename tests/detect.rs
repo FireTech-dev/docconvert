@@ -1,0 +1,13 @@
+mod common;
+use docconvert::{detect::detect_file,model::Format};
+#[test]fn mismatched_image(){let t=common::Temp::new();let p=t.write("a.docx",&common::png());let d=detect_file(&p).unwrap();assert_eq!(d.format,Format::Image);assert!(!d.extension_match);assert!(d.notes.iter().any(|s|s=="extension \".docx\" does not match detected content (image)"))}
+#[test]fn package_detection(){let t=common::Temp::new();for(n,b,f)in[("a.docx",common::docx(""),Format::Docx),("b.epub",common::epub(),Format::Epub),("c.pptx",common::pptx(),Format::Pptx),("d.ods",common::ods(),Format::Ods)]{assert_eq!(detect_file(&t.write(n,&b)).unwrap().format,f)}}
+#[test]fn signatures(){let t=common::Temp::new();assert!(detect_file(&t.write("a.pdf",b"%PDF-1.4 /Encrypt")).unwrap().encrypted);assert_eq!(detect_file(&t.write("a.rtf",br"{\rtf1 hi}")).unwrap().format,Format::Rtf);assert_eq!(detect_file(&t.write("a.xls",b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")).unwrap().format,Format::Xls)}
+#[test]fn empty_and_truncated(){let t=common::Temp::new();assert_eq!(detect_file(&t.write("empty.txt",b"")).unwrap_err().to_string(),"corrupt document: file is empty");assert!(detect_file(&t.write("broken.docx",b"PK\x03\x04")).is_err())}
+#[test]fn pk_prefix_text_not_corrupt(){let t=common::Temp::new();let d=detect_file(&t.write("pk.txt",b"PK heroes of the old world\nsecond line\n")).unwrap();assert!(d.format==Format::Txt||d.format==Format::Markdown)}
+#[test]fn pk_empty_archive_signature_still_zip_branch(){let t=common::Temp::new();let mut b=b"PK\x05\x06".to_vec();b.extend([0u8;22]);let r=detect_file(&t.write("empty.zip",&b));assert!(r.is_err()||r.unwrap().notes.iter().any(|s|s.contains("ZIP")))}
+#[test]fn csv_semicolon_sniffed(){let t=common::Temp::new();let d=detect_file(&t.write("x.csv",b"a;b\n1;2\n")).unwrap();assert_eq!(d.format,Format::Csv);assert!(d.notes.iter().any(|s|s=="CSV delimiter: semicolon"))}
+#[test]fn csv_tie_falls_back_to_comma(){let t=common::Temp::new();let d=detect_file(&t.write("y.csv",b"a,b;c\n1,2;3\n")).unwrap();assert_eq!(d.format,Format::Csv);assert!(d.notes.iter().any(|s|s=="CSV delimiter: comma"))}
+#[test]fn non_utf8_csv_and_unknown_mismatch_note(){// A8 decisions: CSV detection is UTF-8-gated (binary .csv → Unknown, never a
+// forced Csv), and every Unknown carries an extension-mismatch note.
+let t=common::Temp::new();let d=detect_file(&t.write("data.csv",&[0xff,0xfe,0x00,0x41])).unwrap();assert_eq!(d.format,Format::Unknown);assert!(d.notes.iter().any(|s|s.contains("does not match detected content")));let d=detect_file(&t.write("mystery.xyz",&[0x00,0x01,0x02,0x03])).unwrap();assert_eq!(d.format,Format::Unknown);assert!(d.notes.iter().any(|s|s.contains("does not match detected content")))}

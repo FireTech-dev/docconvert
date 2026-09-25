@@ -1,0 +1,61 @@
+name: Source candidate validation
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - {os: ubuntu-24.04, native: LINUX_X64}
+          - {os: ubuntu-24.04-arm, native: LINUX_ARM64}
+          - {os: macos-15-intel, native: MACOS_X64}
+          - {os: macos-15, native: MACOS_ARM64}
+          - {os: windows-2022, native: WINDOWS_X64}
+        profile: [default, pdf-layout]
+    runs-on: ${{ matrix.platform.os }}
+    steps:
+      # Pinned to full commit SHAs (reviewed 2026-09-24 against the v4 tags); re-pin deliberately, never float.
+      - uses: actions/checkout@11bd596a326750d5838078e36cf38b85af677262 # v4
+      - name: Require user-generated lockfile and pinned toolchain
+        shell: bash
+        env:
+          TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN }}
+        run: |
+          test -f Cargo.lock || { echo 'Generate and commit Cargo.lock using RUN_TEST_GUIDE.md'; exit 1; }
+          test -n "$TOOLCHAIN" || { echo 'Set RUST_TOOLCHAIN to a reviewed exact Rust release'; exit 1; }
+          rustup toolchain install "$TOOLCHAIN" --profile minimal
+          rustup override set "$TOOLCHAIN"
+          rustc -Vv
+          cargo -V
+      - name: Install reviewed native library (layout only)
+        if: matrix.profile == 'pdf-layout'
+        shell: bash
+        env:
+          PDFIUM_URL: ${{ vars[format('PDFIUM_URL_{0}', matrix.platform.native)] }}
+          PDFIUM_SHA256: ${{ vars[format('PDFIUM_SHA256_{0}', matrix.platform.native)] }}
+        run: |
+          python scripts/fetch_pdfium.py
+          echo "PDFIUM_DYNAMIC_LIB_PATH=$PWD/native/pdfium" >> "$GITHUB_ENV"
+      - name: Build and test
+        shell: bash
+        env:
+          PROFILE: ${{ matrix.profile }}
+        run: |
+          FLAGS=()
+          if [ "$PROFILE" = pdf-layout ]; then FLAGS=(--features pdf-layout); fi
+          cargo build --locked "${FLAGS[@]}"
+          cargo test --locked "${FLAGS[@]}"
+          cargo build --locked --release "${FLAGS[@]}"
+          cargo tree --locked "${FLAGS[@]}" > dependency-tree.txt
+          if [ "$PROFILE" = default ]; then ! grep -q pdfium-render dependency-tree.txt; fi
+          python scripts/package_binary.py "$PROFILE"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: candidate-${{ matrix.platform.native }}-${{ matrix.profile }}
+          path: |
+            release-artifacts/
+            dependency-tree.txt
+# Candidate builds only. No automatic release, tag, audit, or fuzz-success claim.
