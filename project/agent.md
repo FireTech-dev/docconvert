@@ -4,7 +4,7 @@
 > **Version:** 1.0
 > **Maintained By:** Orchestrator & Implementer
 > **Created From:** `project/agent.template.md`
-> **Status:** Complete — v1.0 tagged + pushed + RELEASED 2026-10-09 (release `v1.0`, id 407834593: 10 platform tarballs + 10 manifests + SHA256SUMS from tag-CI run 37913020914); owner-approved with documented caveats (below); confirmatory release re-audit APPROVED 2026-10-09 (23 pass / 0 Blocking / 1 Advisory / 4 N/A)
+> **Status:** Closed — v1.0 shipped, released and audit-approved 2026-10-09 (tag + 21 published assets + confirmatory APPROVED 23/0/1/4); docs completed (BUILDING.md, README v1.0); full history in `project/agent-archive.md`
 > **Created:** 2026-09-16
 > **Last Updated:** 2026-10-09
 
@@ -326,6 +326,22 @@ Known Failures: None.
 # 15. Session Log
 
 Session Log archived to `project/agent-archive.md` ("Post-Closure Release Run" section) on 2026-10-09 at v1.0 approval; this section starts fresh.
+
+## 2026-10-09 — Project closed (Orchestrator)
+
+Session Summary: User said "commit and close the project as done". Set header Status to Closed, staged and committed all project-side pending files: `README.md`, `RUN_TEST_GUIDE.md`, `docs/BUILDING.md` (Documenter batch), `project/agent.md`, plus the two deferred 2026-09-25 audit reports so the release history is complete in-tree. Left untouched/untracked: user files (`sam/`, `package.json`, roles additions). Local-only `release-artifacts/` (gitignored) and `target/` rebuild stay on disk, out of the commit. No push (not instructed) — `main` is two commits ahead of origin; tag v1.0 + Release already published.
+
+## 2026-10-09 — Documenter: BUILDING.md + README release fixes (Documenter)
+
+Session Summary: User asked (1) whether the source archive compiles (yes — proven by the local rebuild), (2) to update docs per the Documenter role, (3) to cover cross-platform compilation. New `docs/BUILDING.md`: prerequisites table, verified native build/test/package commands, `pdf-layout` + PDFium pointer, cross-compilation matrix with honest verification statuses (linux-x86_64 built locally; other four CI-native proven; Windows cross-check attempted — rustc fine but first fetch of Windows-only crates needs network, exact error recorded; macOS cross marked build-on-Mac due to SDK licensing), troubleshooting. README: retitled to v1.0, removed "not a release" + "no binary supplied" + "remain open" claims, added Start-here build/release pointers and docs-list entries. RUN_TEST_GUIDE: dated supersede-note only (full rewrite out of scope). No source, test, or config changes. Uncommitted.
+
+Repository Status: main at 7ebca81 (ahead of origin); docs changes uncommitted.
+
+## 2026-10-09 — Local packaging: source + app as separate archives (Orchestrator)
+
+Session Summary: User said "package the source code and the built app", then "it must be separate". Rebuilt default release from clean (`cargo build --locked --release --offline`, 14m29s) and produced two separate local archives in `release-artifacts/` (gitignored, local-only): (1) app `docconvert-linux-x86_64-default.tar.gz` (1,962,925 B; binary 4,320,280 B = 4.12MiB ≤5MB ✓, sha `faac7b0f…`) via `scripts/package_binary.py default` + manifest json; (2) source `docconvert-v1.0-source.tar.gz` (493,109 B, 167 files via `git archive HEAD`, sha `99c1cf6d…`) — verified clean (no `target/`, `node_modules/`, `.git/config`, or `sam/` inside). Smoke-tested the packaged binary (extract + convert, exit 0). `pdf-layout` not built locally (no native PDFium here) — that profile ships via the published GitHub Release. No source changes; `target/` rebuilt as a side effect.
+
+Repository Status: main at 7ebca81 (ahead of origin); tag v1.0 + Release published; confirmatory APPROVED.
 
 ## 2026-10-09 — Codebase cleanup + state commit (Orchestrator)
 

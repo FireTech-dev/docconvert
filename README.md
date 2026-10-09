@@ -1,8 +1,7 @@
-# docconvert — source candidate with researched skills, revision 4
+# docconvert v1.0
 
 Offline Rust CLI/library converting documents to Markdown or plain text.
-Source implementations span Phases 0–6 (Cargo 0.1.0). Default-profile build/test green as a dated fact: 2026-10-09, 142 passed, 1 ignored, zero build warnings, toolchain 1.98.0.
-This is not a release or a claim that all blueprint requirements are complete.
+Released as [v1.0](https://github.com/FireTech-dev/docconvert/releases/tag/v1.0) with published binaries for Linux, macOS and Windows (default and `pdf-layout` profiles). Default-profile suite: 142 passed, 1 ignored, zero build warnings, toolchain 1.98.0.
 
 ## Two PDF build profiles
 
@@ -18,9 +17,8 @@ See [project/architecture.md](project/architecture.md) AD-1 for why two profiles
 
 ## Start here
 
-Follow **[RUN_TEST_GUIDE.md](RUN_TEST_GUIDE.md)** for installation, dependency pinning,
-lockfile generation, both builds, all tests, fake OCR, samples and diagnostics.
-`Cargo.lock` is committed (supply-chain pinning); no native binary/release binary is supplied. After user setup:
+Grab a binary from the [v1.0 release](https://github.com/FireTech-dev/docconvert/releases/tag/v1.0), or build from source — see **[docs/BUILDING.md](docs/BUILDING.md)** (prerequisites, native and cross-platform builds, tests, packaging).
+`Cargo.lock` is committed (supply-chain pinning). After setup:
 
 ```sh
 cargo run --locked -- input.docx -o converted
@@ -45,6 +43,8 @@ implementation. This documentation update does not change or validate applicatio
 
 ## Documentation and status
 
+- [Building from source](docs/BUILDING.md) — prerequisites, native/cross builds, tests, packaging
+- [Run/test guide](RUN_TEST_GUIDE.md) — user-side verification, fake OCR, samples, diagnostics
 - [CLI flags](docs/cli-reference.md) — live-help inventory checked by written tests
 - [Format quirks](docs/format-quirks.md) — per-format behavior and incomplete fidelity
 - [PDFium sourcing](docs/pdfium-setup.md) — library paths, ABI and CI setup
@@ -56,9 +56,10 @@ implementation. This documentation update does not change or validate applicatio
 
 Supported source paths include DOCX, EPUB, ODT, RTF, HTML/Markdown/text, CSV/TSV,
 XLSX/XLS/ODS, PPTX, PDF and standalone image assets. Legacy DOC/PPT/ODP remain
-unsupported/detect-and-report. Full grammar, native layout safety, corpus/fuzz coverage,
-release-size targets and reproducible builds remain open. See the guide before testing
-untrusted documents; current external OCR has no timeout or subprocess sandbox.
+unsupported/detect-and-report. Known limits: corpus depth for some formats is
+representative-only (see the release notes), and external OCR has no timeout or
+subprocess sandbox. See [format quirks](docs/format-quirks.md) before converting
+untrusted documents.
 
 ## License
 

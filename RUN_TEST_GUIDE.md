@@ -1,5 +1,7 @@
 # Run and Test Guide — Phases 0–6 Source Candidate — Skills Revision 4
 
+> Note (2026-10-09): this guide predates the v1.0 release. The project has since been built, tested (142 passed, 1 ignored, zero warnings), tagged `v1.0`, and published with binaries — see [README.md](README.md) and [docs/BUILDING.md](docs/BUILDING.md). The commands below remain valid for user-side verification.
+
 ## Skills reference pack
 
 This revision adds `skills/README.md`, 34 researched skills and a complete step/topic
