@@ -18,12 +18,12 @@ Current Step: P6-S05 — Samples, README, packaging
 
 Current Objective: All phases complete. Project verified.
 
-Overall Progress: P6-S05 In Progress. CI 10/10 user-reported green. AQ-012 FIXED (text-wins + zero-yield placeholders; Database 9KB/0-text → 3.47MB text). AQ-013 FIXED 2026-10-04 (vendored pdf-extract/CMap hardening; 16/16 retained pdf artifacts contained, verified 2026-10-09, suite 142/0/1). FUZZ GATE MET 2026-10-09 (csv 24.00h, rtf 24.01h, pdf 24.01h post-patch, zero new findings). Patch batch COMMITTED 2026-10-09 (c17171d, unpushed — push not requested). Release Done still blocked — reviews, tag pending.
+Overall Progress: P6-S05 In Progress. CI 10/10 user-reported green. AQ-012 FIXED (text-wins + zero-yield placeholders; Database 9KB/0-text → 3.47MB text). AQ-013 FIXED 2026-10-04 (vendored pdf-extract/CMap hardening; 16/16 retained pdf artifacts contained, verified 2026-10-09, suite 142/0/1). FUZZ GATE MET 2026-10-09 (csv 24.00h, rtf 24.01h, pdf 24.01h post-patch, zero new findings). Patch batches pushed 2026-10-09 (through ee8981d). Release Done still blocked — v1.0 tag + published artifacts pending (security re-audit clean 0 blocking; release re-audit NOT APPROVED with 2 Blocking: unshipped release).
 
 Repository Status
-- Current Branch: main (tracks origin/main, behind local by 2 — dca3ebc + c17171d, NOT pushed, push not requested)
-- Latest Commit: c17171d (AQ-013 vendor+harden + bare-name fix + dep bumps + fuzz gate, committed 2026-10-09)
-- Working Tree: committed clean except user untracked files (package.json/lock, sam/, roles/documenter.md, roles/readme.template.md, audit reports), all left untouched
+- Current Branch: main (in sync with origin/main — pushed 2026-10-09: 9cc9be1..ee8981d)
+- Latest Commit: ee8981d (zero-warning vendored crates + security re-audit report, committed 2026-10-09)
+- Working Tree: committed clean except this log entry + user untracked files (package.json/lock, sam/, roles/documenter.md, roles/readme.template.md, 2026-09-25 audit reports), all left untouched
 - Last Successful Build: 2026-10-09 — `cargo build --locked --offline` clean on committed tree c17171d (vendored pdf-extract lib warnings only, cosmetic), toolchain 1.98.0.
 
 # 1. Project Summary
@@ -148,12 +148,12 @@ See docs/implementation-notes.md for the detailed current list. Important unreso
 - **[High, security audit 2026-09-25] quick-xml 0.38.4: RUSTSEC-2026-0194 + RUSTSEC-2026-0195 — RESOLVED same session: direct dep → 0.41 + calamine 0.31→0.36.1 (whose quick-xml ^0.41 unifies the tree; 0.38.4 gone from lock); suite 139/0/1 green with zero P2 changes (used API surface stable across the jump).**
 - **[High, security audit 2026-09-25] ttf-parser 0.25.1 unmaintained (transitive via lopdf 0.42 ← pdf-extract 0.12.1, itself latest — no upstream fix available); warning-severity, documented residual, revisit on pdf-extract update.**
 - **[Blocker, fuzz 2026-10-04 — RESOLVED 2026-10-09] pdf target was blocked at ~1.05 CPU-h (3772s, 22,678 runs): 15 libFuzzer crash artifacts in `fuzz/artifacts/fuzz_pdf/` (11x `pdf-extract 0.12.1 lib.rs:177:52 maybe_deref expect("missing object reference")` / ObjectNotFound; 3x `adobe-cmap-parser 0.4.1 lib.rs:169:31 failed to parse: Mismatch`; 1x `pdf-extract lib.rs:204:69 expect("wrong type")`). All three sites sit inside production `decode_whole`'s `catch_unwind` (`src/extract/pdf.rs:27`), but cargo-fuzz compiles with `-Cpanic=abort` so `catch_unwind` cannot contain them under fuzz (known rust-fuzz behavior) — production (panic=unwind, `Cargo.toml:42`) converts these to `Corrupt`, fuzz reports deadly-signal exit 77. FIXED 2026-10-04 (see AQ-013): vendored patch, 16/16 retained artifacts contained (verified 2026-10-09, zero signal deaths), pdf gate MET 2026-10-09 with a fresh post-patch 24h run: 86427s (24.01 CPU-h), 792,655 runs, corpus 1028, zero new crash/oom/timeout/leak via `scripts/fuzz_batch.sh --targets pdf`.**
-- No build/test/API compatibility evidence or Cargo.lock.
-- Streaming XML rewrite is source-inspected but uncompiled; API/ownership/runtime behavior and performance need user verification.
+- Cross-platform build/API compatibility evidence still pending (local linux-x86_64_default only).
+- Streaming XML rewrite compiled, tested, suite-pinned, and committed; platform-port verification still pending.
 - Local images, navigation warning aggregation, basic table spans/wrapping and PPTX object order have source changes and new regressions. Complex Markdown grammar, advanced RTF/ODF/number-format cases and full fixture coverage remain pending.
 - Not all blueprint-required fixture variants have test coverage.
 - Output staging rolls back ordinary errors in source; power-loss atomicity, race-proof sandboxing and platform hard-link support are not verified.
-- No dependency/security audit or corpus/CI evidence. Fuzz COMPLETE 2026-10-09: csv 24.00 CPU-h (86403s, 12,195,781 runs, corpus 5506, 0 crash/oom/timeout — slow-units only), rtf 24.01 CPU-h (86447s, 34,393,191 runs, corpus 31353, 0 crash/oom/timeout — slow-units only), pdf 24.01 CPU-h post-patch (86427s, 792,655 runs, corpus 1028, zero NEW crash/oom/timeout/leak across the counted window; 16 stale pre-patch crash artifacts retained in fuzz/artifacts/fuzz_pdf/, all dated ≤2026-10-04 and each contained — see 2026-10-09 log) per `fuzz/.batch-state/` + `TARGET DONE` log lines;
+- Dependency (`cargo audit` 0 vulnerabilities) and security (re-audit 2026-10-09, 0 blocking) evidence recorded; corpus/CI gaps remain. Fuzz COMPLETE 2026-10-09: csv 24.00 CPU-h (86403s, 12,195,781 runs, corpus 5506, 0 crash/oom/timeout — slow-units only), rtf 24.01 CPU-h (86447s, 34,393,191 runs, corpus 31353, 0 crash/oom/timeout — slow-units only), pdf 24.01 CPU-h post-patch (86427s, 792,655 runs, corpus 1028, zero NEW crash/oom/timeout/leak across the counted window; 16 stale pre-patch crash artifacts retained in fuzz/artifacts/fuzz_pdf/, all dated ≤2026-10-04 and each contained — see 2026-10-09 log) per `fuzz/.batch-state/` + `TARGET DONE` log lines;
 
 These are not silently waived by the source-only authorization. Do not mark Phases 0–6 fully conformant merely because modules exist.
 
@@ -323,6 +323,36 @@ Known Failures: None.
 4. Then: initial commit + architecture/security reviews + tag (no tag until §14 evidenced).
 
 # 15. Session Log
+
+## 2026-10-09 — Remote CI matrix green on ee8981d (user-reported)
+
+Session Summary: User reports the GitHub Actions matrix ("Source candidate validation", 5 platforms × 2 profiles = 10 jobs) is all green on the pushed tree including ee8981d (PR/run #4). Taken as user-reported evidence (run log not inspected from here — no `gh` CLI in this environment). This closes the "remote CI never executed" §14 gap; the push itself was the trigger.
+
+Important Notes: Remaining release Blockers per the 2026-10-09 release re-audit: v1.0 tag + published per-platform artifacts for both profiles (§14 corpus shortfalls for epub/html/odt/xml stand as documented). No tag cut here (needs explicit instruction). No commit this turn (agent.md log only).
+
+Repository Status: main in sync with origin/main (ee8981d); agent.md dirty (this log); no tag.
+
+## 2026-10-09 — Release-audit fixes: dual license + README + state prune (Implementer/Orchestrator)
+
+Session Summary: User said "fix the issues and use MIT and Apache license". Fixed every fixable release-audit issue in the worktree (uncommitted — no commit instruction this turn): (1) dual-licensed `MIT OR Apache-2.0` — new `LICENSE-MIT` (standard text, (c) 2026 FireTech-dev per repo ownership) + `LICENSE-APACHE` (standard 2.0 text + appendix boilerplate), `Cargo.toml` gained `license = "MIT OR Apache-2.0"`, README gained a License section; holder assumption flagged for correction. (2) README advisory: dated fact refreshed (2026-10-09, 142/1, zero warnings), lockfile claim corrected (Cargo.lock IS committed), all stray trailer headings removed, all doc links re-verified. (3) agent.md staleness pruned (Cargo.lock/uncompiled/audit-evidence bullets, push state). Verified: build clean, full suite 142/0/1.
+
+NOT fixed (cannot be, stated plainly): v1.0 tag + published per-platform artifacts (§14 corpus short for epub/html/odt/xml, remote CI matrix never executed) — cutting a tag now would falsify the audit's own conditions, so no tag was cut. Release re-audit required after those close.
+
+Files Created: LICENSE-MIT, LICENSE-APACHE. Files Modified: Cargo.toml, README.md, project/agent.md (this log). Tests Executed: full `cargo test --locked --offline` 142/0/1, zero warnings.
+
+Repository Status: main in sync with origin/main (ee8981d); fix batch uncommitted; no tag.
+
+## 2026-10-09 — Release re-audit: NOT APPROVED, 2 Blocking left (Release Auditor)
+
+Session Summary: User invoked `@roles/release-auditor.md`. Re-audit of the 2026-09-25 verdict (NOT APPROVED, 3 Blocking). Walked all 28 requirements against live evidence, no fixes made (role forbids), no commits. Report: `project/release-audit-2026-10-09.md` (new, uncommitted).
+
+Completed Steps: template + arch/blueprint/agent reads → live verification: full suite re-run 142/0/1 zero warnings; core flows (md/txt/csv/html+assets, bare-CWD name, preview) all exit 0; README `cargo run --locked` path verbatim; tracked-tree secrets grep clean; `cargo audit` 0 vulns (from today's run); checklist/hygiene/tag/license checks.
+
+Verdict: NOT APPROVED — 21 pass / 2 Blocking fail / 1 Advisory fail / 4 N/A. Blocking: (1) P6-S05 acceptance NOT MET — no v1.0 tag, §14 corpus/CI/publish gaps; (2) no shipped release (documented + locally exercised once, no tag/artifacts). Prior bare-name Blocking failure RESOLVED and proven live. Advisory: still no LICENSE; README staleness grew (stale facts + 4 stray trailer headings); stale agent.md prose. Note: local `.git/config` holds the push PAT in plaintext — rotate it; never commit it.
+
+Important Notes: Project is one tag + published artifacts away from approval. P6-S05 still NOT MET. No commit, no tag (release-auditor role; re-audit after Blocking items close).
+
+Repository Status: main in sync with origin/main (ee8981d); agent.md + new report uncommitted; no tag.
 
 ## 2026-10-09 — Security re-audit: 0 Critical/High, 1 Informational (Security Auditor)
 

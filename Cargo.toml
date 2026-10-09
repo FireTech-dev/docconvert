@@ -3,6 +3,7 @@ name = "docconvert"
 version = "0.1.0"
 edition = "2021"
 description = "Offline document conversion to Markdown and plain text"
+license = "MIT OR Apache-2.0"
 
 [lib]
 name = "docconvert"

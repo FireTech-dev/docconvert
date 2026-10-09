@@ -1,7 +1,7 @@
 # docconvert — source candidate with researched skills, revision 4
 
 Offline Rust CLI/library converting documents to Markdown or plain text.
-Source implementations span Phases 0–6 (Cargo 0.1.0). Default-profile build/test green as a dated fact: 2026-09-23, 95 passed, 1 ignored, toolchain 1.98.0.
+Source implementations span Phases 0–6 (Cargo 0.1.0). Default-profile build/test green as a dated fact: 2026-10-09, 142 passed, 1 ignored, zero build warnings, toolchain 1.98.0.
 This is not a release or a claim that all blueprint requirements are complete.
 
 ## Two PDF build profiles
@@ -20,7 +20,7 @@ See [project/architecture.md](project/architecture.md) AD-1 for why two profiles
 
 Follow **[RUN_TEST_GUIDE.md](RUN_TEST_GUIDE.md)** for installation, dependency pinning,
 lockfile generation, both builds, all tests, fake OCR, samples and diagnostics.
-No Cargo.lock/native binary/release binary is supplied. After user setup:
+`Cargo.lock` is committed (supply-chain pinning); no native binary/release binary is supplied. After user setup:
 
 ```sh
 cargo run --locked -- input.docx -o converted
@@ -59,9 +59,7 @@ XLSX/XLS/ODS, PPTX, PDF and standalone image assets. Legacy DOC/PPT/ODP remain
 unsupported/detect-and-report. Full grammar, native layout safety, corpus/fuzz coverage,
 release-size targets and reproducible builds remain open. See the guide before testing
 untrusted documents; current external OCR has no timeout or subprocess sandbox.
-# docconvert
-# docconvert
-# docconvert
-# docconvert
-# docconvert
-# docconvert
+
+## License
+
+Dual-licensed `MIT OR Apache-2.0` — see [LICENSE-MIT](LICENSE-MIT) and [LICENSE-APACHE](LICENSE-APACHE).
