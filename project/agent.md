@@ -18,13 +18,13 @@ Current Step: P6-S05 — Samples, README, packaging
 
 Current Objective: All phases complete. Project verified.
 
-Overall Progress: P6-S05 In Progress. CI 10/10 user-reported green. AQ-012 FIXED (text-wins + zero-yield placeholders; Database 9KB/0-text → 3.47MB text). AQ-013 FIXED 2026-10-04 (vendored pdf-extract/CMap hardening; 16/16 retained pdf artifacts contained, verified 2026-10-09, suite 142/0/1). FUZZ GATE MET 2026-10-09 (csv 24.00h, rtf 24.01h, pdf 24.01h post-patch, zero new findings). Release Done still blocked — commit-remainder, reviews, tag pending.
+Overall Progress: P6-S05 In Progress. CI 10/10 user-reported green. AQ-012 FIXED (text-wins + zero-yield placeholders; Database 9KB/0-text → 3.47MB text). AQ-013 FIXED 2026-10-04 (vendored pdf-extract/CMap hardening; 16/16 retained pdf artifacts contained, verified 2026-10-09, suite 142/0/1). FUZZ GATE MET 2026-10-09 (csv 24.00h, rtf 24.01h, pdf 24.01h post-patch, zero new findings). Patch batch COMMITTED 2026-10-09 (c17171d, unpushed — push not requested). Release Done still blocked — reviews, tag pending.
 
 Repository Status
-- Current Branch: main (tracks origin/main, behind local by 1)
-- Latest Commit: dca3ebc (AQ-011/AQ-012/link/guide batch, committed 2026-09-25, NOT pushed — push not requested)
-- Working Tree: committed clean except pre-existing non-batch modifications (pdfium-setup.md, agent-archive.md, pdf_layout.rs) + user untracked files, all left untouched
-- Last Successful Build: 2026-09-25 — `cargo build --locked` clean (zero warnings), toolchain 1.98.0.
+- Current Branch: main (tracks origin/main, behind local by 2 — dca3ebc + c17171d, NOT pushed, push not requested)
+- Latest Commit: c17171d (AQ-013 vendor+harden + bare-name fix + dep bumps + fuzz gate, committed 2026-10-09)
+- Working Tree: committed clean except user untracked files (package.json/lock, sam/, roles/documenter.md, roles/readme.template.md, audit reports), all left untouched
+- Last Successful Build: 2026-10-09 — `cargo build --locked --offline` clean on committed tree c17171d (vendored pdf-extract lib warnings only, cosmetic), toolchain 1.98.0.
 
 # 1. Project Summary
 
@@ -323,6 +323,50 @@ Known Failures: None.
 4. Then: initial commit + architecture/security reviews + tag (no tag until §14 evidenced).
 
 # 15. Session Log
+
+## 2026-10-09 — Security re-audit: 0 Critical/High, 1 Informational (Security Auditor)
+
+Session Summary: User invoked `@roles/security-auditor.md`. Re-audit of the 2026-09-25 report, delta-focused (c17171d vendoring/`parent_or_dot`/dep bumps/layout changes + today's warning-silence edits) with full control re-proof. Adversarial, no fixes made (role forbids), no commits (frozen). Report: `project/security-audit-2026-10-09.md` (new, uncommitted).
+
+Completed Steps: threat-model review → surface ranking (vendored hostile-PDF code first) → data-flow traces (normalize fail-closed, OCR argv-only, staging/symlink refusals, batch guards) → 3 live temp probes (bare-CWD loader escape, shell-metachar engine string, OCR symlink re-proof — all green, then removed, code kept in report) → 16/16 artifact containment re-proof on the final tree → `cargo audit` (0 vulns, 1 accepted residual warning) → pdfium-blob hash matched to documented provenance → confirmation pass → report.
+
+Findings: 0 Critical, 0 High, 0 Medium, 0 Low, 1 Informational (vendored path-patches bypass advisory version-matching; mitigated by fuzz gate + manual compare; no code change). Nothing mirrored to Known Issues (none met the bar). Prior Low stays Resolved; prior Informational (audit never run) Closed by execution.
+
+Important Notes: Standing security-auditor referral now answered by this report (0 blocking findings). P6-S05 still NOT MET (release re-review + tag). No commit, no tag (frozen till approval).
+
+Repository Status: main at c17171d + uncommitted audit batch (patches warning-silence, this report, agent.md); no tag.
+
+## 2026-10-09 — Fifth audit-and-fix pass: Q1 warnings fixed, no new compliance findings (self-audit, Closed)
+
+Session Summary: User invoked `@roles/audit-and-fix.md`. No architect.md/designer.md — equivalent-file rule (architecture/blueprint as decisions; Designer N/A headless CLI), same as prior passes. Scope: fifth pass; delta-focused (c17171d batch) + regression sweeps, since four prior passes already covered all 42 steps at code level. Read: orchestrator.md, architecture.md, blueprint.md, agent.md, agent-archive.md (all in full or current-state verified).
+
+Passes: (1) Phase-by-phase — c17171d delta verified hunk-by-hunk against session-log claims (patch wiring, parent_or_dot + pin, dep bumps + unified quick-xml 0.41.0 single copy confirmed via cargo tree, layout preflight/dedupe as documented); unchanged phases record-verified, no drift. (2) Full-project — sweeps: zero expect!/panic!/todo! in src/, unwraps all test-or-infallible, 1 justified allow (ocr.rs), argv-only Command, no TODOs; blueprint-vs-tree standing items unchanged (negative_suite naming closed-decision, xml.rs gap recorded); skills/ restored 40/40; cli_docs drift covered by suite.
+
+Findings: Q1 (quality, FIXED) — vendored crates emitted 30 build warnings (surfaced by path-patch wire-up; registry deps suppress these), regressing the zero-warning standard: 11 unused vars (dlog-only bindings) → underscore renames; dead upstream API (get_catalog/get_pages/decode/8 structs/enum) → bare #[allow(dead_code)] per file convention; style lints → targeted allows + `dst_CID_lo`→`dst_cid_lo` rename (4 sites, field-level allow empirically ignored by rustc 1.98). Diligence note: one rename initially hit the wrong shadowed binding (live `unicode_map` at old-:497 vs dlog-only at old-:530) — compiler caught it (E0599), repaired with anchored context, no harm. Verified: workspace build ZERO warnings; suite 142/0/1; 16/16 artifacts contained, 0 signal deaths — behavior provably unchanged. No compliance findings. AQ-013 residual expects (FromObj wrong-type/[T;4] unwraps) retired by evidence (792k post-patch fuzz runs, zero new findings + containment re-proven), not by code. Flagged: none new. Security: no new trust boundaries; security-auditor referral stands.
+
+Files Modified: patches/pdf-extract/src/lib.rs, patches/pdf-extract/src/glyphnames.rs, patches/adobe-cmap-parser/src/lib.rs, project/agent.md (this log; all UNCOMMITTED — commits frozen till release approval). Tests Executed: full `cargo test --locked --offline` 142/0/1; 16-artifact decode check 16 graceful/0 signals.
+
+Repository Status: main at c17171d + uncommitted audit batch (patches warning-silence + agent.md); no tag.
+
+## 2026-10-09 — Post-commit verification, commits frozen till approval (Orchestrator)
+
+Session Summary: User said "proceed", with commits frozen until release approval. Verified the committed tree as-is (no new commits): worktree holds only the agent.md log/status edits plus pre-existing user untracked files. `cargo build --locked --offline` clean on c17171d; full `cargo test --locked --offline` 142 passed, 0 failed, 1 ignored across 16 suites — matches pre-commit baseline exactly. Nothing staged, nothing committed this turn.
+
+Files Created: none. Files Modified: project/agent.md (this log + build line; left UNCOMMITTED per instruction). Tests Executed: build + full suite as above.
+
+Important Notes: Release path from here per docs/ci-setup.md §6: (1) invoke release-auditor + security-auditor roles for re-review (prior verdicts: release NOT APPROVED, security 1 Low + 1 Info — both predate AQ-013/fuzz-gate/commit); (2) tag v1.0 only on approval; (3) commits resume after approval. P6-S05 still NOT MET (reviews, tag).
+
+Repository Status: main at c17171d (ahead of origin by 2, unpushed); agent.md dirty (log only); no tag.
+
+## 2026-10-09 — Patch batch committed (Orchestrator)
+
+Session Summary: User chose "Restore skills/, then commit". Restored 40 `skills/*.md` from HEAD (`git restore skills/` — disk had been empty since ~Oct 4; verified 40/40 back, zero diff), then reviewed every hunk of the dirty tree before staging: Cargo.toml (quick-xml 0.38→0.41, calamine 0.31→0.36, `[patch.crates-io]`), both lockfiles, fuzz harness files + `scripts/fuzz_batch.sh`, docs (ci-setup batch-runner §5, pdfium trust warning + sizes), `parent_or_dot` bare-name fix + e2e pin, pdf_layout preflight-recovery + glyph dedupe/shadow-drop, AQ-013 tripwire test, agent.md/archive state. Removed 4 cargo-registry junk files (`.cargo-ok`, `.cargo_vcs_info.json`) from the vendored patch dirs before staging. Pre-commit `cargo build --locked --offline` clean. Committed as c17171d (no push — not requested). Left untouched: package.json/lock, sam/, roles/documenter.md, roles/readme.template.md, both audit reports (untracked review artifacts for a separate commit decision).
+
+Files Created: none. Files Modified: all staged files above + project/agent.md (this log, uncommitted). Dependencies Added: none (quick-xml/calamine bumps were prior-session changes, committed here). Tests Executed: build clean pre-commit; suite 142/0/1 from earlier today stands (nothing compiled changed since).
+
+Important Notes: P6-S05 still NOT MET (reviews, tag). agent.md now dirty with only this log entry + status lines. Next: re-reviews then tag per docs/ci-setup.md §6.
+
+Repository Status: main ahead by 2 (dca3ebc + c17171d), unpushed; no tag.
 
 ## 2026-10-09 — Fuzz gate met: 3/3 targets ≥24 CPU-h, zero new findings (Orchestrator)
 
@@ -1005,3 +1049,4 @@ Prior sessions (startup, source batch, revisions 2–4, skills research) archive
 | self-audit | v2.0 (merged) | Scope: Phase-by-Phase + Full-Project (code-level, all 42 steps + cross-cutting). Architect/designer role files absent — architecture.md/blueprint.md used as Architect decisions per equivalent-file rule; Designer N/A (headless CLI, arch §1) | Fixed 15 clear findings (C1–C15, see Session Log); 22 items flagged for Architect (A1–A22, see report in log); security items referred to security-auditor.md | **Closed** |
 | self-audit | v2.0 (merged) | 2026-09-25 audit-and-fix session: third full pass; focus on post-2026-09-24 changes (AQ-011/012, link fallback, ocr allow, CI/fuzz/batch-test scripts, docs) + regression sweep | Fixed F1 (fuzz run-output gitignore); no new compliance/quality findings; standing referrals unchanged | **Closed** |
 | self-audit | v2.0 (merged) | 2026-09-25 audit-and-fix session: fourth full pass; focus on post-third-audit changes (dep bumps quick-xml/calamine, bare-name fix, security/release reports) + regression sweep | TBD (see Session Log) | **Open** |
+| self-audit | v2.0 (merged) | 2026-10-09 audit-and-fix session: fifth pass; focus on post-fourth-audit delta (c17171d: vendored pdf-extract/CMap hardening, parent_or_dot, dep bumps, fuzz gate) + regression sweeps | Fixed Q1 (vendored-crate warnings 30→0, behavior-neutral; suite 142/0/1 + 16/16 containment re-proven). No new compliance findings; residual vendored expects retired by 24h fuzz evidence. Standing referrals unchanged | **Closed** |

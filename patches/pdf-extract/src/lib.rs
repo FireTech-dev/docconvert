@@ -22,6 +22,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::rc::Rc;
 use std::marker::PhantomData;
+#[allow(hidden_glob_reexports)]
 use std::result::Result;
 use log::{warn, error, debug};
 mod core_fonts;
@@ -89,6 +90,7 @@ fn get_info(doc: &Document) -> Option<&Dictionary> {
     None
 }
 
+#[allow(dead_code)]
 fn get_catalog(doc: &Document) -> &Dictionary {
     match doc.trailer.get(b"Root").unwrap() {
         &Object::Reference(ref id) => {
@@ -102,16 +104,17 @@ fn get_catalog(doc: &Document) -> &Dictionary {
     panic!();
 }
 
+#[allow(dead_code)]
 fn get_pages(doc: &Document) -> &Dictionary {
     let catalog = get_catalog(doc);
     match catalog.get(b"Pages").unwrap() {
         &Object::Reference(ref id) => {
             match doc.get_object(*id) {
                 Ok(&Object::Dictionary(ref pages)) => { return pages; }
-                other => {dlog!("pages: {:?}", other)}
+                _other => {dlog!("pages: {:?}", _other)}
             }
         }
-        other => { dlog!("pages: {:?}", other)}
+        _other => { dlog!("pages: {:?}", _other)}
     }
     dlog!("catalog {:?}", catalog);
     panic!();
@@ -315,6 +318,7 @@ struct PdfSimpleFont<'a> {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 struct PdfType3Font<'a> {
     font: &'a Dictionary,
     doc: &'a Document,
@@ -494,7 +498,7 @@ impl<'a> PdfSimpleFont<'a> {
                                 let unicode = glyphnames::name_to_unicode(&name);
                                 if let Some(unicode) = unicode{
                                     table[code as usize] = unicode;
-                                    if let Some(ref mut unicode_map) = unicode_map {
+                                if let Some(ref mut unicode_map) = unicode_map {
                                         let be = [unicode];
                                         match unicode_map.entry(code as u32) {
                                             // If there's a unicode table entry missing use one based on the name
@@ -516,7 +520,7 @@ impl<'a> PdfSimpleFont<'a> {
                                             // code point, so we'll use an empty string instead. See issue #76
                                             match unicode_map.entry(code as u32) {
                                                 Entry::Vacant(v) => { v.insert("".to_owned()); }
-                                                Entry::Occupied(e) => {
+                                                Entry::Occupied(_e) => {
                                                     panic!("unexpected entry in unicode map")
                                                 }
                                             }
@@ -527,7 +531,7 @@ impl<'a> PdfSimpleFont<'a> {
                                     }
                                 }
                                 dlog!("{} = {} ({:?})", code, name, unicode);
-                                if let Some(ref mut unicode_map) = unicode_map {
+                                if let Some(ref mut _unicode_map) = unicode_map {
                                     // The unicode map might not have the code in it, but the code might
                                     // not be used so we don't want to panic here.
                                     // An example of this is the 'suppress' character in the TeX Latin Modern font.
@@ -541,8 +545,8 @@ impl<'a> PdfSimpleFont<'a> {
                     }
                 }
                 // "Type" is optional
-                let name = encoding.get(b"Type").and_then(|x| x.as_name()).and_then(|x| Ok(pdf_to_utf8(x)));
-                dlog!("name: {}", name);
+                let _name = encoding.get(b"Type").and_then(|x| x.as_name()).and_then(|x| Ok(pdf_to_utf8(x)));
+                dlog!("name: {}", _name);
 
                 encoding_table = Some(table);
             }
@@ -588,7 +592,7 @@ impl<'a> PdfSimpleFont<'a> {
             }
             assert_eq!(first_char + i - 1, last_char);
         } else {
-            let name = if is_core_font(&base_name) {
+            let _name = if is_core_font(&base_name) {
                 &base_name
             } else {
                 warn!("no widths and not core font {:?}", base_name);
@@ -687,6 +691,7 @@ impl<'a> PdfSimpleFont<'a> {
     }
 
     #[allow(dead_code)]
+    #[allow(mismatched_lifetime_syntaxes)]
     fn get_descriptor(&self) -> Option<PdfFontDescriptor> {
         maybe_get_obj(self.doc, self.font, b"FontDescriptor").and_then(|desc| desc.as_dict().ok()).map(|desc| PdfFontDescriptor{desc: desc, doc: self.doc})
     }
@@ -730,7 +735,7 @@ impl<'a> PdfType3Font<'a> {
                                     table[code as usize] = unicode;
                                 }
                                 dlog!("{} = {} ({:?})", code, name, unicode);
-                                if let Some(ref unicode_map) = unicode_map {
+                                if let Some(ref _unicode_map) = unicode_map {
                                     dlog!("{} {:?}", code, unicode_map.get(&(code as u32)));
                                 }
                                 code += 1;
@@ -740,7 +745,7 @@ impl<'a> PdfType3Font<'a> {
                     }
                 }
                 let name_encoded = encoding.get(b"Type");
-                if let Ok(Object::Name(name)) = name_encoded {
+                if let Ok(Object::Name(_name)) = name_encoded {
                     dlog!("name: {}", pdf_to_utf8(name));
                 } else {
                     dlog!("name not found");
@@ -797,9 +802,11 @@ trait PdfFont : Debug {
 }
 
 impl<'a> dyn PdfFont + 'a {
+    #[allow(mismatched_lifetime_syntaxes)]
     fn char_codes(&'a self, chars: &'a [u8]) -> PdfFontIter {
         PdfFontIter{i: chars.iter(), font: self}
     }
+    #[allow(dead_code)]
     fn decode(&self, chars: &[u8]) -> String {
         let strings = self.char_codes(chars).map(|x| self.decode_char(x.0)).collect::<Vec<_>>();
         strings.join("")
@@ -989,7 +996,7 @@ fn get_unicode_map<'a>(doc: &'a Document, font: &'a Dictionary) -> Option<HashMa
 
 impl<'a> PdfCIDFont<'a> {
     fn new(doc: &'a Document, font: &'a Dictionary) -> PdfCIDFont<'a> {
-        let base_name = get_name_string(doc, font, b"BaseFont");
+        let _base_name = get_name_string(doc, font, b"BaseFont");
         let descendants = maybe_get_array(doc, font, b"DescendantFonts").expect("Descendant fonts required");
         let ciddict = maybe_deref(doc, &descendants[0]).as_dict().expect("should be CID dict");
         let encoding = maybe_get_obj(doc, font, b"Encoding").expect("Encoding required in type0 fonts");
@@ -1004,7 +1011,7 @@ impl<'a> PdfCIDFont<'a> {
                 let name = pdf_to_utf8(name);
                 dlog!("encoding {:?}", name);
                 if name == "Identity-H" || name == "Identity-V" {
-                    ByteMapping { codespace: vec![CodeRange{width: 2, start: 0, end: 0xffff }], cid: vec![CIDRange{ src_code_lo: 0, src_code_hi: 0xffff, dst_CID_lo: 0 }]}
+                    ByteMapping { codespace: vec![CodeRange{width: 2, start: 0, end: 0xffff }], cid: vec![CIDRange{ src_code_lo: 0, src_code_hi: 0xffff, dst_cid_lo: 0 }]}
                 } else {
                     empty_mapping()
                 }
@@ -1096,7 +1103,7 @@ impl<'a> PdfFont for PdfCIDFont<'a> {
         let code = code?;
         for range in &self.encoding.cid {
             if code.0 >= range.src_code_lo && code.0 <= range.src_code_hi {
-                return Some((code.0 + range.dst_CID_lo, code.1 as u8));
+                return Some((code.0 + range.dst_cid_lo, code.1 as u8));
             }
         }
         None
@@ -1121,6 +1128,7 @@ impl<'a> fmt::Debug for PdfCIDFont<'a> {
 
 
 #[derive(Copy, Clone)]
+#[allow(dead_code)]
 struct PdfFontDescriptor<'a> {
     desc: &'a Dictionary,
     doc: &'a Document
@@ -1140,6 +1148,7 @@ impl<'a> fmt::Debug for PdfFontDescriptor<'a> {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 struct Type0Func {
     domain: Vec<f64>,
     range: Vec<f64>,
@@ -1172,6 +1181,7 @@ impl Type0Func {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 struct Type2Func {
     c0: Option<Vec<f64>>,
     c1: Option<Vec<f64>>,
@@ -1179,6 +1189,7 @@ struct Type2Func {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 enum Function {
     Type0(Type0Func),
     Type2(Type2Func),
@@ -1422,6 +1433,7 @@ impl Path {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct CalGray {
     white_point: [f64; 3],
     black_point: Option<[f64; 3]>,
@@ -1429,6 +1441,7 @@ pub struct CalGray {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct CalRGB {
     white_point: [f64; 3],
     black_point: Option<[f64; 3]>,
@@ -1437,6 +1450,7 @@ pub struct CalRGB {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct Lab {
     white_point: [f64; 3],
     black_point: Option<[f64; 3]>,
@@ -1455,6 +1469,7 @@ pub enum AlternateColorSpace {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct Separation {
     name: String,
     alternate_space: AlternateColorSpace,
@@ -1955,6 +1970,7 @@ fn insert_nbsp(input: &str) -> String {
 }
 
 impl<'a> HTMLOutput<'a> {
+    #[allow(mismatched_lifetime_syntaxes)]
     pub fn new(file: &mut dyn std::io::Write) -> HTMLOutput {
         HTMLOutput {
             file,
@@ -2033,6 +2049,7 @@ pub struct SVGOutput<'a>  {
     file: &'a mut dyn std::io::Write
 }
 impl<'a> SVGOutput<'a> {
+    #[allow(mismatched_lifetime_syntaxes)]
     pub fn new(file: &mut dyn std::io::Write) -> SVGOutput {
         SVGOutput{file}
     }
@@ -2240,9 +2257,9 @@ impl<W: ConvertToFmt> OutputDev for PlainTextOutput<W> {
 pub fn print_metadata(doc: &Document) {
     dlog!("Version: {}", doc.version);
     if let Some(ref info) = get_info(&doc) {
-        for (k, v) in *info {
+        for (_k, v) in *info {
             match v {
-                &Object::String(ref s, StringFormat::Literal) => { dlog!("{}: {}", pdf_to_utf8(k), pdf_to_utf8(s)); }
+                &Object::String(ref _s, StringFormat::Literal) => { dlog!("{}: {}", pdf_to_utf8(_k), pdf_to_utf8(_s)); }
                 _ => {}
             }
         }

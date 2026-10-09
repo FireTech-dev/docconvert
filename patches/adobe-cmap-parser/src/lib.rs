@@ -267,8 +267,7 @@ pub struct CodeRange {
 pub struct CIDRange {
     pub src_code_lo: u32,
     pub src_code_hi: u32,
-    #[allow(non_snake_case)]
-    pub dst_CID_lo: u32,
+    pub dst_cid_lo: u32,
 }
 
 #[derive(Debug)]
@@ -305,7 +304,7 @@ pub fn get_byte_mapping(input: &[u8]) -> Result<ByteMapping, &'static str> {
                             let start = if let &Value::LiteralString(ref s) = &lexed[i] { Ok(s) } else { Err("begincidrange exected hexstring") }?;
                             let end = if let &Value::LiteralString(ref s) = &lexed[i+1] { Ok(s) } else { Err("begincidrange exected hexstring") }?;
                             let offset = if let &Value::Integer(ref s) = &lexed[i+2] { Ok(s) } else { Err("begincidrange exected int") }?;
-                            result.cid.push(CIDRange { src_code_lo: as_code(start), src_code_hi: as_code(end), dst_CID_lo: *offset as u32 });
+                            result.cid.push(CIDRange { src_code_lo: as_code(start), src_code_hi: as_code(end), dst_cid_lo: *offset as u32 });
                             i += 2;
                         }
                         i += 1;

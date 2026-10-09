@@ -4,6 +4,7 @@
      https://github.com/apache/pdfbox/blob/trunk/pdfbox/src/main/resources/org/apache/pdfbox/resources/glyphlist/additional.txt
  */
 pub fn name_to_unicode(name: &str) -> Option<u16> {
+    #[allow(non_upper_case_globals)]
     const names: [(&'static str, u16); 4700] = [
 ("A", 0x0041),
 ("AE", 0x00c6),
