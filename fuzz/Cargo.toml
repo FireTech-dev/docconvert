@@ -33,3 +33,8 @@ path = "fuzz_targets/fuzz_csv.rs"
 test = false
 doc = false
 bench = false
+
+# Mirror of the root [patch.crates-io] (fuzz builds resolve deps independently).
+[patch.crates-io]
+pdf-extract = { path = "../patches/pdf-extract" }
+adobe-cmap-parser = { path = "../patches/adobe-cmap-parser" }

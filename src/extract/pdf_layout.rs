@@ -63,20 +63,38 @@ pub fn extract_pdf_layout(bytes:&[u8],ctx:&mut ExtractCtx<'_>)->Result<Document>
     // Serialize the native library lifecycle; file-level workers still parallelize other formats.
     static NATIVE:std::sync::Mutex<()>=std::sync::Mutex::new(());
     let _native=NATIVE.lock().unwrap_or_else(|p|p.into_inner());
-    let _checked=pdf::preflight(bytes)?;
+    // Finding fix (user-authorized): preflight's lopdf load rejects some valid
+    // PDFs (e.g. incremental-update xref chains pdfium itself reads fine). An
+    // Encrypted verdict still hard-stops here; a Corrupt verdict only warns and
+    // lets PDFium attempt recovery — if it also fails, the preflight error is
+    // returned, so truly corrupt files see the identical contract as before.
+    let preflight_error=match pdf::preflight(bytes){
+        Ok(_)=>None,
+        Err(e)if matches!(e,ConvertError::Encrypted(_))=>return Err(e),
+        Err(e)=>Some(e),
+    };
     let configured=ctx.options.pdfium_lib_path.clone().or_else(||std::env::var_os("PDFIUM_DYNAMIC_LIB_PATH").map(PathBuf::from));
     let pdfium=shared_pdfium(configured)?;
     // A12: PDFium password/security refusals surface as Encrypted (same variant as
     // the default path), never misreported as Corrupt.
-    let source=pdfium.load_pdf_from_byte_slice(bytes,None).map_err(|e|match e{
-        PdfiumError::PdfiumLibraryInternalError(PdfiumInternalError::PasswordError)|PdfiumError::PdfiumLibraryInternalError(PdfiumInternalError::SecurityError)=>ConvertError::Encrypted("password-protected PDF is not supported".into()),
-        _=>ConvertError::Corrupt("PDFium could not load PDF".into()),
-    })?;
-    let mut pages=vec![];let mut doc=Document::default();let mut total_glyphs=0usize;let mut total_pixels=0usize;let mut total_objects=0usize;
+    let source=match pdfium.load_pdf_from_byte_slice(bytes,None){
+        Ok(source)=>source,
+        Err(e)=>return Err(preflight_error.unwrap_or_else(||match e{
+            PdfiumError::PdfiumLibraryInternalError(PdfiumInternalError::PasswordError)|PdfiumError::PdfiumLibraryInternalError(PdfiumInternalError::SecurityError)=>ConvertError::Encrypted("password-protected PDF is not supported".into()),
+            _=>ConvertError::Corrupt("PDFium could not load PDF".into()),
+        })),
+    };
+    let recovered=preflight_error.is_some();
+    let mut pages=vec![];let mut doc=Document::default();if recovered{doc.warnings.push("default structure scan could not load this PDF; layout recovery applied".into())}let mut total_glyphs=0usize;let mut total_pixels=0usize;let mut total_objects=0usize;
     for page in source.pages().iter(){
         let width=page.width().value;let height=page.height().value;if !width.is_finite()||!height.is_finite()||width<=0.||height<=0.{return Err(ConvertError::Corrupt("invalid PDF page dimensions".into()))}
         let text=page.text().map_err(|_|ConvertError::Corrupt("PDFium page text unavailable".into()))?;let chars=text.chars();let mut glyphs=vec![];
         for ch in chars.iter(){total_glyphs+=1;if total_glyphs>1_000_000||glyphs.len()>=100_000{return Err(ConvertError::Corrupt("PDF glyph limit exceeded".into()))}if let Some(c)=ch.unicode_char(){if c.is_control(){continue}let bounds=ch.loose_bounds().map_err(|_|ConvertError::Corrupt("PDF glyph bounds unavailable".into()))?;let bbox=(bounds.left().value,bounds.bottom().value,bounds.right().value,bounds.top().value);let size=ch.scaled_font_size().value;if [bbox.0,bbox.1,bbox.2,bbox.3,size].iter().any(|v|!v.is_finite()){return Err(ConvertError::Corrupt("invalid PDF glyph metrics".into()))}glyphs.push(Glyph{ch:c,bbox,font_size:size,font_name:format!("{}{}{}",ch.font_name(),if ch.font_is_fixed_pitch(){" mono"}else{""},if ch.font_is_bold_reenforced(){" bold"}else{""})});}}
+        // Finding fix (user-authorized): some producers double-draw glyphs (faux
+        // bold); PDFium reports both copies, which used to render as "AABB".
+        // Drop exact duplicates (same char, near-identical box); legitimately
+        // repeated characters sit at distinct positions and survive.
+        let glyphs=drop_shadows(dedupe_glyphs(glyphs));
         let mut pictures=vec![];let mut segments=vec![];
         for object in page.objects().iter(){total_objects+=1;if total_objects>100_000{return Err(ConvertError::Corrupt("PDF object limit exceeded".into()))}
             if let Some(image)=object.as_image_object(){let bounds=image.bounds().map_err(|_|ConvertError::Corrupt("PDF image bounds unavailable".into()))?;let w=image.width().map_err(|_|ConvertError::Corrupt("PDF image dimensions unavailable".into()))?;let h=image.height().map_err(|_|ConvertError::Corrupt("PDF image dimensions unavailable".into()))?;let pixels=(w as i64).checked_mul(h as i64).filter(|n|w>0&&h>0&&*n<=20_000_000).ok_or_else(||ConvertError::Corrupt("PDF image pixel limit exceeded".into()))? as usize;total_pixels=total_pixels.saturating_add(pixels);if total_pixels>50_000_000{return Err(ConvertError::Corrupt("PDF total image pixel limit exceeded".into()))}
@@ -91,6 +109,79 @@ pub fn extract_pdf_layout(bytes:&[u8],ctx:&mut ExtractCtx<'_>)->Result<Document>
     let mut frequencies:BTreeMap<i32,usize>=BTreeMap::new();for g in pages.iter().flat_map(|p|&p.lines).filter(|l|!l.is_header_footer).flat_map(|l|&l.glyphs){*frequencies.entry((g.font_size*2.).round()as i32).or_default()+=1}let body=frequencies.iter().max_by_key(|(_,n)|*n).map(|(s,_)|*s as f32/2.).unwrap_or(12.);let sizes:Vec<i32>=frequencies.keys().rev().filter(|s|**s as f32/2.>=body*1.15).copied().collect();
     for(n,p)in pages.into_iter().enumerate(){doc.blocks.push(Block::Boundary(Boundary::Page(n+1)));if let Some(ref blocks)=p.ocr{doc.blocks.extend(blocks.clone());for picture in p.pictures{doc.blocks.push(Block::Image{asset:picture.asset,alt:None,caption:None})}continue}if p.scanned{doc.blocks.push(pdf::scanned_block(n+1));doc.warnings.push(format!("PDF page {} needs OCR",n+1))}doc.blocks.extend(reconstruct(p,body,&sizes,&mut doc.warnings));}
     doc.warnings.push("PDF layout reconstruction is heuristic; math is literal Unicode, not LaTeX; extracted image pixels are re-encoded as PNG".into());Ok(doc)
+}
+fn dedupe_glyphs(mut glyphs:Vec<Glyph>)->Vec<Glyph>{
+    // Tolerance 1.0pt: faux-bold copies at small sizes measured dx=0.74 dy=0.52.
+    // Legitimate same-char advances run 3pt+ even at 6pt type (verified against
+    // the 6.0 advance of the test helper and 4.6pt 9pt-body advances in the wild),
+    // and stacked diacritics differ in char — so nothing real merges.
+    glyphs.sort_by(|a,b|a.bbox.0.total_cmp(&b.bbox.0).then_with(||a.bbox.1.total_cmp(&b.bbox.1)).then_with(||a.ch.cmp(&b.ch)));
+    let mut out:Vec<Glyph>=Vec::with_capacity(glyphs.len());
+    for g in glyphs{
+        let dup=out.last().map(|l|l.ch==g.ch&&(l.bbox.0-g.bbox.0).abs()<1.0&&(l.bbox.1-g.bbox.1).abs()<1.0&&(l.bbox.2-g.bbox.2).abs()<1.0&&(l.bbox.3-g.bbox.3).abs()<1.0).unwrap_or(false);
+        if !dup{out.push(g)}
+    }
+    out
+}
+/// Drop-shadow copies: display type is often drawn twice with a fixed small
+/// offset (measured: dx=1.96 dy=2.00 at 40pt, dx=0.74 dy=0.52 at 12pt on a real
+/// cover), which otherwise renders as "AABB". A shadow is systematic: one
+/// same-char offset shared across several distinct characters. Candidate bins
+/// are tried largest-first (>=3 pairs each); the first whose disjointly paired
+/// participants span >=3 distinct chars wins. Dotted leaders fail the
+/// distinct-chars bar; small body text fails the 10pt size bar — both are
+/// never merged.
+fn drop_shadows(glyphs:Vec<Glyph>)->Vec<Glyph>{
+    // Size bar at 10pt: subtitle faux-bold measured at 12pt with a systematic
+    // (0.74, 0.52) offset. Below 10pt, advances shrink toward the 3pt pair
+    // window, so small body text stays out entirely. At >=10pt, running text is
+    // still safe: pair formation needs same-char neighbors within 3pt (body
+    // advances run 4.6pt+), and even a pathological voter still needs >=3
+    // distinct chars sharing one offset at >=40% participation.
+    let big=glyphs.iter().enumerate().filter(|(_,g)|g.font_size>=10.).map(|(i,_)|i).collect::<Vec<_>>();
+    if big.len()<4||big.len()>5000{return glyphs}
+    // Bucket by char first: only same-char pairs can be shadow copies.
+    let mut by_char:std::collections::BTreeMap<char,Vec<usize>>=std::collections::BTreeMap::new();
+    for &i in &big{by_char.entry(glyphs[i].ch).or_default().push(i)}
+    let mut votes:std::collections::BTreeMap<(i32,i32),Vec<(usize,usize)>>=std::collections::BTreeMap::new();
+    for members in by_char.values(){
+        for (k,&i) in members.iter().enumerate(){
+            for &j in &members[k+1..]{
+                let dx=glyphs[j].bbox.0-glyphs[i].bbox.0;let dy=glyphs[j].bbox.1-glyphs[i].bbox.1;
+                if dx.abs()>3.||dy.abs()>3.{continue}
+                let key=((dx*4.).round() as i32,(dy*4.).round() as i32);
+                if key==(0,0){continue}
+                votes.entry(key).or_default().push((i,j));
+            }
+        }
+    }
+    // Try bins largest-first, looping until no bin passes: one page can carry
+    // several shadow layers at different offsets (measured: title (1.96,2.00)
+    // plus subtitle (0.74,0.52) on one cover). A decoy bin (dotted leaders,
+    // repeated ornaments) may outvote a real one, so every passing bin applies
+    // in turn. Guards per bin: >=3 pairs, >=3 distinct chars among the
+    // disjointly paired participants (leaders use one char).
+    let mut alive=vec![true;glyphs.len()];
+    loop{
+        let mut bins=votes.iter().collect::<Vec<_>>();
+        bins.sort_by(|a,b|b.1.len().cmp(&a.1.len()));
+        let mut applied=false;
+        for (_,pairs) in bins{
+            let fresh=pairs.iter().filter(|(i,j)|alive[*i]&&alive[*j]).collect::<Vec<_>>();
+            if fresh.len()<3{continue}
+            let mut used=vec![false;glyphs.len()];let mut kept=vec![];
+            for (i,j) in fresh{if !used[*i]&&!used[*j]{used[*i]=true;used[*j]=true;kept.push((*i,*j))}}
+            let distinct=glyphs.iter().enumerate().filter(|(i,_)|used[*i]).map(|(_,g)|g.ch).collect::<std::collections::BTreeSet<_>>();
+            if distinct.len()<3{continue}
+            for (_,j) in kept{alive[j]=false}
+            applied=true;
+            break;
+        }
+        if !applied{break}
+    }
+    // Recompute the vote table from survivors each round would be cleaner; the
+    // fresh-filter above is equivalent because dropped glyphs only shrink pairs.
+    glyphs.into_iter().enumerate().filter(|(i,_)|alive[*i]).map(|(_,g)|g).collect()
 }
 fn math_base(g:&Glyph)->bool{let n=g.font_name.to_lowercase();n.contains("cambria math")||n.contains("stix")||n.contains("symbol")||n.contains("euclid math")||matches!(g.ch as u32,0x1d400..=0x1d7ff|0x2200..=0x22ff)}
 fn is_arrow(c:char)->bool{matches!(c as u32,0x2190..=0x21ff)}
@@ -164,6 +255,32 @@ use super::*;
 fn glyphs(s:&str,x:f32,y:f32)->Vec<Glyph>{s.chars().enumerate().map(|(i,ch)|Glyph{ch,bbox:(x+i as f32*6.,y,x+i as f32*6.+5.,y+10.),font_size:12.,font_name:"Helvetica".into()}).collect()}
 #[test]fn columns_are_column_major(){let mut gs=vec![];for(y,a,b)in [(700.,"Left one","Right one"),(680.,"Left two","Right two"),(660.,"Left end","Right end")]{gs.extend(glyphs(a,30.,y));gs.extend(glyphs(b,330.,y));}let ordered=order_reading(cluster_lines(&gs),600.);let s=ordered.iter().map(Line::text).collect::<Vec<_>>().join("|");assert!(s.find("Left end").unwrap()<s.find("Right one").unwrap(),"{s}");}
 #[test]fn repetition_requires_distinct_pages(){let mut pages:Vec<_>=(0..3).map(|_|PageData{lines:vec![line(glyphs("Header",20.,770.)),line(glyphs("Body",20.,400.))],width:600.,height:800.,segments:vec![],pictures:vec![],ocr:None,scanned:false}).collect();strip_repetition(&mut pages);assert!(pages.iter().all(|p|p.lines[0].is_header_footer&&!p.lines[1].is_header_footer));}
+#[test]fn double_drawn_glyphs_dedupe(){let g=glyphs("A",0.,0.)[0].clone();assert_eq!(dedupe_glyphs(vec![g.clone(),g.clone()]).len(),1);assert_eq!(dedupe_glyphs(glyphs("AA",0.,0.)).len(),2);let mut near=glyphs("A",0.,0.)[0].clone();near.bbox.0+=0.74;near.bbox.1+=0.52;near.bbox.2+=0.74;near.bbox.3+=0.52;assert_eq!(dedupe_glyphs(vec![g,near]).len(),1);}
+#[test]fn shadow_copies_drop_but_leaders_survive(){
+    // Systematic double-draw at 24pt with a fixed (1.96, 2.00) offset.
+    let mut cover=vec![];
+    for(rep,dx,dy)in[(0,0.,0.),(1,1.96,2.)]{for(i,ch)in "Hi!".chars().enumerate(){cover.push(Glyph{ch,bbox:(30.+i as f32*14.+dx,700.+dy,35.+i as f32*14.+dx,712.+dy),font_size:24.,font_name:"Display".into()});let _=rep;}}
+    assert_eq!(drop_shadows(cover).len(),3);
+    // Dotted leaders: one repeated char at a regular 2pt advance — fraction and
+    // offset look shadow-like, but the single distinct char vetoes the merge.
+    let mut leaders=vec![];
+    for i in 0..8{leaders.push(Glyph{ch:'.',bbox:(30.+i as f32*2.,700.,31.+i as f32*2.,706.),font_size:24.,font_name:"Display".into()});}
+    assert_eq!(drop_shadows(leaders).len(),8);
+    // Small type never merged, even doubled.
+    let small=glyphs("AA",0.,0.);
+    assert_eq!(drop_shadows(small).len(),2);
+    // Decoy bin (leaders, 7 pairs) outvotes the shadow bin (3 pairs) but fails
+    // the distinct-chars guard, so the shadow bin still wins.
+    let mut mixed=vec![];
+    for i in 0..8{mixed.push(Glyph{ch:'.',bbox:(200.+i as f32*2.,700.,201.+i as f32*2.,706.),font_size:24.,font_name:"Display".into()});}
+    for(rep,dx,dy)in[(0,0.,0.),(1,1.96,2.)]{for(i,ch)in "Hi!".chars().enumerate(){mixed.push(Glyph{ch,bbox:(30.+i as f32*14.+dx,700.+dy,35.+i as f32*14.+dx,712.+dy),font_size:24.,font_name:"Display".into()});let _=rep;}}
+    assert_eq!(drop_shadows(mixed).len(),8+3);
+    // Two shadow layers at different offsets on one page both apply.
+    let mut layers=vec![];
+    for(rep,dx,dy)in[(0,0.,0.),(1,1.96,2.)]{for(i,ch)in "Hi!".chars().enumerate(){layers.push(Glyph{ch,bbox:(30.+i as f32*14.+dx,700.+dy,35.+i as f32*14.+dx,712.+dy),font_size:24.,font_name:"Display".into()});let _=rep;}}
+    for(rep,dx,dy)in[(0,0.,0.),(1,0.74,0.52)]{for(i,ch)in "Yo?".chars().enumerate(){layers.push(Glyph{ch,bbox:(30.+i as f32*14.+dx,640.+dy,35.+i as f32*14.+dx,652.+dy),font_size:24.,font_name:"Display".into()});let _=rep;}}
+    assert_eq!(drop_shadows(layers).len(),6);
+}
 #[test]fn math_range_and_font(){assert!(math_base(&glyphs("∑",0.,0.)[0]));assert!(!math_base(&glyphs("A",0.,0.)[0]));assert!(!math_flags(&glyphs("→",0.,0.))[0]);let mut lone=glyphs("→x",0.,0.);lone[1].font_name="Cambria Math".into();let flags=math_flags(&lone);assert!(flags[0]&&flags[1]);}
 
 #[test]fn two_text_columns_are_not_mistaken_for_unruled_table(){let mut gs=vec![];for y in [700.,680.,660.]{gs.extend(glyphs("Left prose",30.,y));gs.extend(glyphs("Right prose",330.,y));}let mut lines=cluster_lines(&gs);assert!(unruled(&mut lines).is_empty());assert_eq!(lines.len(),3);}

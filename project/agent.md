@@ -4,9 +4,9 @@
 > **Version:** 1.0
 > **Maintained By:** Orchestrator & Implementer
 > **Created From:** `project/agent.template.md`
-> **Status:** In Progress — P6-S05 close-out blocked; §14 evidence pending; git initialized, commit pending
+> **Status:** In Progress — P6-S05 close-out: fuzz §14 item met 2026-10-09 (3/3 targets ≥24 CPU-h, zero new findings); commit-remainder, reviews, tag pending
 > **Created:** 2026-09-16
-> **Last Updated:** 2026-09-25
+> **Last Updated:** 2026-10-09
 
 # Current Status
 
@@ -18,12 +18,12 @@ Current Step: P6-S05 — Samples, README, packaging
 
 Current Objective: All phases complete. Project verified.
 
-Overall Progress: P6-S05 In Progress. CI 10/10 user-reported green. AQ-012 FIXED (text-wins + zero-yield placeholders; Database 9KB/0-text → 3.47MB text). Release Done still blocked — 24h fuzz, commit-remainder, reviews, tag pending.
+Overall Progress: P6-S05 In Progress. CI 10/10 user-reported green. AQ-012 FIXED (text-wins + zero-yield placeholders; Database 9KB/0-text → 3.47MB text). AQ-013 FIXED 2026-10-04 (vendored pdf-extract/CMap hardening; 16/16 retained pdf artifacts contained, verified 2026-10-09, suite 142/0/1). FUZZ GATE MET 2026-10-09 (csv 24.00h, rtf 24.01h, pdf 24.01h post-patch, zero new findings). Release Done still blocked — commit-remainder, reviews, tag pending.
 
 Repository Status
-- Current Branch: main (tracks origin/main)
-- Latest Commit: 9cc9be1 (Windows CI fix, pushed 2026-09-25; prior user commits: first commit + pinned-actions SHA fix)
-- Working Tree: fix files committed clean; remainder of tree state as staged/committed by user
+- Current Branch: main (tracks origin/main, behind local by 1)
+- Latest Commit: dca3ebc (AQ-011/AQ-012/link/guide batch, committed 2026-09-25, NOT pushed — push not requested)
+- Working Tree: committed clean except pre-existing non-batch modifications (pdfium-setup.md, agent-archive.md, pdf_layout.rs) + user untracked files, all left untouched
 - Last Successful Build: 2026-09-25 — `cargo build --locked` clean (zero warnings), toolchain 1.98.0.
 
 # 1. Project Summary
@@ -89,7 +89,7 @@ Rust 1.98.0 and Cargo verified on the build system. Target platforms: Linux/macO
 | Name | Source | Version | Verified | Status |
 | --- | --- | --- | --- | --- |
 | zip | crates.io | 8.x | Yes | Installed |
-| quick-xml | crates.io | 0.38.x | Yes | Installed |
+| quick-xml | crates.io | 0.41.0 | Yes | Installed |
 | clap | crates.io | 4.x | Yes | Installed |
 | serde + serde_json | crates.io | 1.x | Yes | Installed |
 | flate2 | crates.io | 1.x | Yes | Installed |
@@ -98,7 +98,7 @@ Rust 1.98.0 and Cargo verified on the build system. Target platforms: Linux/macO
 | csv | crates.io | 1.x | Yes | Installed |
 | encoding_rs | crates.io | 0.8.x | Yes | Installed |
 | logos | crates.io | 0.15.x | Yes | Installed |
-| calamine | crates.io | 0.31.x | Yes | Installed |
+| calamine | crates.io | 0.36.1 | Yes | Installed |
 | lopdf | crates.io | 0.45.x | Yes | Installed |
 | pdf-extract | crates.io | 0.9.x | Yes | Installed |
 
@@ -138,19 +138,22 @@ Next Step: (h) DONE 2026-09-25 by user-authorized documented decision, blueprint
 
 Relevant Skills: docs, packaging, CI (`skills/docs.md`, `skills/packaging.md`, `skills/ci.md` loaded for close-out).
 
-Acceptance Criteria: NOT MET — §14 items 1–5, 7 without full evidence; `samples_gen` covers representative only (enumeration still Architect-blocked, not claimed); no fuzz hours; CI YAML not run (both-profile runs unverified locally; pdf-layout needs native PDFium). Release evidence 2026-09-24: default release binary 4,303,552 bytes (4.1MiB, within ≤5MB; was 3.0M pre-pdf-extract) — `cargo build --locked --release --offline`, toolchain 1.98.0. Full suite 115 passed, 0 failed, 1 ignored (baseline 107/1 → +8: placeholder, reason, CLI precedence, OMML bound, DOCX header, date_tokens, scanned-Force, CLI batch).
+Acceptance Criteria: NOT MET — §14 items 1–2, 4–5, 7 without full evidence; fuzz hours MET 2026-10-09 (csv 24.00h, rtf 24.01h, pdf 24.01h post-patch, zero new findings); `samples_gen` covers representative only (enumeration still Architect-blocked, not claimed); CI YAML not run (both-profile runs unverified locally; pdf-layout needs native PDFium). Release evidence 2026-09-24: default release binary 4,303,552 bytes (4.1MiB, within ≤5MB; was 3.0M pre-pdf-extract) — `cargo build --locked --release --offline`, toolchain 1.98.0. Full suite 115 passed, 0 failed, 1 ignored (baseline 107/1 → +8: placeholder, reason, CLI precedence, OMML bound, DOCX header, date_tokens, scanned-Force, CLI batch).
 
-Status: In Progress — 2026-09-24 remaining-issues batch: shared-Pdfium fix (multi-bind bug), A12 mapping, samples 25/25, both release sizes, perf evidence, CI SHA pins, fuzz harness + smoke runs; default 130/1 + layout 140/1 green. Still open: real-doc corpus, full 24h fuzz, CI execution, commit/tag (staged), security-auditor referral. 2026-09-25 reverify (default profile only): `cargo build --locked` zero warnings; `cargo test --locked` 130 passed, 0 failed, 1 ignored. 130-vs-131 DELTA RESOLVED 2026-09-25: `cargo test --locked -- --list` shows exactly 131 tests total (130 runnable + 1 ignored `write_samples`); the "131 passed" claim was loose shorthand for 131 total — no test missing, no code changed. (`rg` finds 144 `#[test]` attrs repo-wide; the balance is `cfg(feature = "pdf-layout")`-gated.)
+Status: In Progress — 2026-09-24 remaining-issues batch: shared-Pdfium fix (multi-bind bug), A12 mapping, samples 25/25, both release sizes, perf evidence, CI SHA pins, fuzz harness + smoke runs; default 130/1 + layout 140/1 green. Still open: real-doc corpus, CI execution, commit/tag (staged), security-auditor referral (fuzz gate met 2026-10-09). 2026-09-25 reverify (default profile only): `cargo build --locked` zero warnings; `cargo test --locked` 130 passed, 0 failed, 1 ignored. 130-vs-131 DELTA RESOLVED 2026-09-25: `cargo test --locked -- --list` shows exactly 131 tests total (130 runnable + 1 ignored `write_samples`); the "131 passed" claim was loose shorthand for 131 total — no test missing, no code changed. (`rg` finds 144 `#[test]` attrs repo-wide; the balance is `cfg(feature = "pdf-layout")`-gated.)
 
 # 9. Known Issues
 
 See docs/implementation-notes.md for the detailed current list. Important unresolved issues:
+- **[High, security audit 2026-09-25] quick-xml 0.38.4: RUSTSEC-2026-0194 + RUSTSEC-2026-0195 — RESOLVED same session: direct dep → 0.41 + calamine 0.31→0.36.1 (whose quick-xml ^0.41 unifies the tree; 0.38.4 gone from lock); suite 139/0/1 green with zero P2 changes (used API surface stable across the jump).**
+- **[High, security audit 2026-09-25] ttf-parser 0.25.1 unmaintained (transitive via lopdf 0.42 ← pdf-extract 0.12.1, itself latest — no upstream fix available); warning-severity, documented residual, revisit on pdf-extract update.**
+- **[Blocker, fuzz 2026-10-04 — RESOLVED 2026-10-09] pdf target was blocked at ~1.05 CPU-h (3772s, 22,678 runs): 15 libFuzzer crash artifacts in `fuzz/artifacts/fuzz_pdf/` (11x `pdf-extract 0.12.1 lib.rs:177:52 maybe_deref expect("missing object reference")` / ObjectNotFound; 3x `adobe-cmap-parser 0.4.1 lib.rs:169:31 failed to parse: Mismatch`; 1x `pdf-extract lib.rs:204:69 expect("wrong type")`). All three sites sit inside production `decode_whole`'s `catch_unwind` (`src/extract/pdf.rs:27`), but cargo-fuzz compiles with `-Cpanic=abort` so `catch_unwind` cannot contain them under fuzz (known rust-fuzz behavior) — production (panic=unwind, `Cargo.toml:42`) converts these to `Corrupt`, fuzz reports deadly-signal exit 77. FIXED 2026-10-04 (see AQ-013): vendored patch, 16/16 retained artifacts contained (verified 2026-10-09, zero signal deaths), pdf gate MET 2026-10-09 with a fresh post-patch 24h run: 86427s (24.01 CPU-h), 792,655 runs, corpus 1028, zero new crash/oom/timeout/leak via `scripts/fuzz_batch.sh --targets pdf`.**
 - No build/test/API compatibility evidence or Cargo.lock.
 - Streaming XML rewrite is source-inspected but uncompiled; API/ownership/runtime behavior and performance need user verification.
 - Local images, navigation warning aggregation, basic table spans/wrapping and PPTX object order have source changes and new regressions. Complex Markdown grammar, advanced RTF/ODF/number-format cases and full fixture coverage remain pending.
 - Not all blueprint-required fixture variants have test coverage.
 - Output staging rolls back ordinary errors in source; power-loss atomicity, race-proof sandboxing and platform hard-link support are not verified.
-- No dependency/security audit or corpus/fuzz/CI evidence.
+- No dependency/security audit or corpus/CI evidence. Fuzz COMPLETE 2026-10-09: csv 24.00 CPU-h (86403s, 12,195,781 runs, corpus 5506, 0 crash/oom/timeout — slow-units only), rtf 24.01 CPU-h (86447s, 34,393,191 runs, corpus 31353, 0 crash/oom/timeout — slow-units only), pdf 24.01 CPU-h post-patch (86427s, 792,655 runs, corpus 1028, zero NEW crash/oom/timeout/leak across the counted window; 16 stale pre-patch crash artifacts retained in fuzz/artifacts/fuzz_pdf/, all dated ≤2026-10-04 and each contained — see 2026-10-09 log) per `fuzz/.batch-state/` + `TARGET DONE` log lines;
 
 These are not silently waived by the source-only authorization. Do not mark Phases 0–6 fully conformant merely because modules exist.
 
@@ -262,6 +265,14 @@ Question: Scanned detection flags NeedsOcr only when a page's content stream lac
 
 Status: Resolved 2026-09-25 by user "fix it" authorization — documented decision, blueprint unchanged, two-layer fix in `extract_pdf_flat` (`src/extract/pdf.rs`): (1) zero-yield substantial pages join the scanned set (placeholder + honest count) when attribution is aligned or the whole decode is empty — blank (trivial-stream) pages stay bare; (2) decoded text always wins over the scanned flag — the diag proved why: 478pp novel decoded 808,965 real chars with zero formfeeds, all attributed to page 1, which was operator-absent, so the old branch discarded the entire blob (9KB/0-text output). Pinned by `zero_yield_substantial_page_gets_placeholder` + `blank_page_stays_bare`. Proven: Database (1376pp) went 9KB/0-text/1-scan → 3.47MB real text, 0 placeholders, OCR warning correctly gone, 0 FFFD. Full suite 139/0/1, zero warnings; release 4,310,304 B.
 
+## AQ-013 — PDF fuzz crashes: upstream fix/replace (pdf-extract/adobe-cmap-parser)
+
+Blueprint Steps: P4-S01 (dependency + catch_unwind containment), P6-S05 (§14 fuzz gate).
+
+Question: 15 pdf fuzz crashes (11x pdf-extract 0.12.1 `maybe_deref` expect ObjectNotFound lib.rs:177:52; 3x adobe-cmap-parser 0.4.1 expect lib.rs:169:31 CMap Mismatch; 1x pdf-extract expect("wrong type") lib.rs:204:69) sit inside `decode_whole` catch_unwind (`src/extract/pdf.rs:27`), uncatchable under cargo-fuzz `-Cpanic=abort`. Production (panic=unwind) returns `Corrupt`; fuzz reports deadly-signal exit 77.
+
+Status: User ruled 2026-10-04 "Upstream fix/replace". FIXED same session as user-authorized P4-S01 drift correction, blueprint unchanged: vendored `patches/pdf-extract` (0.12.1) + `patches/adobe-cmap-parser` (0.4.1) with hostile-input hardening only (same versions, graceful-None/skip instead of expect/todo!/assert — dangling refs, malformed CMaps, unsupported Type0 encodings, hostile Tf/Do font/XObject refs, fontless text spans), wired via `[patch.crates-io]` in `Cargo.toml` + `fuzz/Cargo.toml` (both lockfiles updated). Proven: all 15 retained pdf crash artifacts decode without panic (14 OK + 1 graceful Corrupt → recheck 15/15 OK after final edits), 120s post-patch fuzz smoke 1171 runs/0 crashes, full suite 142/0/1 green (phase4 14/14 incl. new `dangling_tounicode_never_panics` tripwire + pre-existing `malformed_font_panic_is_contained` still green), 15 artifacts seeded into `fuzz/corpus/fuzz_pdf/` as regression seeds. Residual: unproven expect sites remain in the vendored code (content-stream operands, W-array bounds, MediaBox, Subtype dispatch) — fuzz will prove or not; pdf 24h gate MET 2026-10-09: 86427s (24.01 CPU-h), 792,655 runs, corpus 1028, zero new crash/oom/timeout/leak (16 stale pre-patch artifacts retained, 16/16 contained — see 2026-10-09 log). No commit, no tag.
+
 # 12. Security Checklist
 
 - Secrets: N/A — none introduced.
@@ -284,7 +295,7 @@ Status: Resolved 2026-09-25 by user "fix it" authorization — documented decisi
 | Security/adversarial | 27 | 27 |
 | Regression | 27 | 27 |
 
-Latest Test Run: 2026-09-25 — default 139 passed (137 + 2 AQ-012 tests), 0 failed, 1 ignored, zero warnings, toolchain 1.98.0. Release 4,310,304 B (≤5MB). Prior evidence (not re-run today): `pdf-layout` profile 144 tests listed 2026-09-25 via `cargo test --locked --offline --features pdf-layout -- --list` (131 default + 13 layout-gated; pre-shadow-fix claim 140/1 is superseded — 3 shadow/hijack tests added since; execution still needs native PDFium, absent). Release evidence: default 4,307,952 B (4.11MiB ≤5MB); layout 4,188,216 B (3.99MiB) sha `248688cf…` (see docs/pdfium-setup.md). Fuzz smoke (nightly + cargo-fuzz 0.13.2, ASan): rtf 247,187 runs/91s, pdf 561,111/91s, csv 39,956/91s — zero crashes; §14 24h/target still open. Perf: 100 mixed files batch exit 0 in 18.3s wall (≪5min gate). CI YAML: 10 combos valid, actions pinned to SHAs (checkout 11bd596a, upload-artifact ea165f8d); workflow never executed (needs vars + runners). Corpus (11 real PDFs): 11/11 convertible — 8 default-clean (0 U+FFFD) + 3 via layout (Active/app-comb/Automate → md; cover doubling fixed, fragments poppler-confirmed genuine); 0 crashes — see Session Log. 2026-09-25 CI-equivalent local (linux-x86_64 default only): `cargo tree --locked` zero pdfium entries (pdf-extract 0.12.1 + lopdf 0.45/0.42); `cargo build --locked --release` 4,307,952 B within ≤5MB; `package_binary.py default` archive sha `7ba7d9f7…`, lock sha `4573af18…`; cli_docs drift test green (in 130/0/1 suite). Remote 10-combo matrix NOT executed (needs GitHub runners + RUST_TOOLCHAIN/PDFIUM_* vars); pdf-layout NOT re-run (native lib absent — chromium/ dir gone, repo-root .so known-incompatible). Fuzz smoke 2026-09-25 (nightly + cargo-fuzz 0.13.2, ASan, 90s/target): rtf 156,466 runs, pdf 476,309, csv 29,073 — zero crashes, no crash/oom/timeout artifacts; §14 24 CPU-hours/target NOT met (≈0.025 CPU-h each — full runs need ~18 wall-hours on 4 cores, see Session Log for commands).
+Latest Test Run: 2026-10-09 — default 142 passed, 0 failed, 1 ignored (post-fuzz-gate re-verify; `pdf-extract` vendored lib emits unused-var warnings, cosmetic, patch code only). Prior: 2026-09-25 — default 141 passed (139 + parent_or_dot unit + bare-name e2e), 0 failed, 1 ignored, zero warnings, toolchain 1.98.0. Release 4,310,304 B (≤5MB, pre-bare-name-fix build). Prior evidence (not re-run today): `pdf-layout` profile 144 tests listed 2026-09-25 via `cargo test --locked --offline --features pdf-layout -- --list` (131 default + 13 layout-gated; pre-shadow-fix claim 140/1 is superseded — 3 shadow/hijack tests added since; execution still needs native PDFium, absent). Release evidence: default 4,307,952 B (4.11MiB ≤5MB); layout 4,188,216 B (3.99MiB) sha `248688cf…` (see docs/pdfium-setup.md). Fuzz smoke (nightly + cargo-fuzz 0.13.2, ASan): rtf 247,187 runs/91s, pdf 561,111/91s, csv 39,956/91s — zero crashes; §14 24h/target now met 2026-10-09 (see gate evidence above). Perf: 100 mixed files batch exit 0 in 18.3s wall (≪5min gate). CI YAML: 10 combos valid, actions pinned to SHAs (checkout 11bd596a, upload-artifact ea165f8d); workflow never executed (needs vars + runners). Corpus (11 real PDFs): 11/11 convertible — 8 default-clean (0 U+FFFD) + 3 via layout (Active/app-comb/Automate → md; cover doubling fixed, fragments poppler-confirmed genuine); 0 crashes — see Session Log. 2026-09-25 CI-equivalent local (linux-x86_64 default only): `cargo tree --locked` zero pdfium entries (pdf-extract 0.12.1 + lopdf 0.45/0.42); `cargo build --locked --release` 4,307,952 B within ≤5MB; `package_binary.py default` archive sha `7ba7d9f7…`, lock sha `4573af18…`; cli_docs drift test green (in 130/0/1 suite). Remote 10-combo matrix NOT executed (needs GitHub runners + RUST_TOOLCHAIN/PDFIUM_* vars); pdf-layout NOT re-run (native lib absent — chromium/ dir gone, repo-root .so known-incompatible). Fuzz smoke 2026-09-25 (nightly + cargo-fuzz 0.13.2, ASan, 90s/target): rtf 156,466 runs, pdf 476,309, csv 29,073 — zero crashes, no crash/oom/timeout artifacts; §14 24 CPU-hours/target MET 2026-10-09 (csv 24.00h, rtf 24.01h, pdf 24.01h post-patch — supersedes the 90s-smoke figures).
 
 Coverage: Not measured. All test files executed successfully.
 
@@ -312,6 +323,152 @@ Known Failures: None.
 4. Then: initial commit + architecture/security reviews + tag (no tag until §14 evidenced).
 
 # 15. Session Log
+
+## 2026-10-09 — Fuzz gate met: 3/3 targets ≥24 CPU-h, zero new findings (Orchestrator)
+
+Session Summary: User reported all three fuzz targets completed. Verified from `fuzz/.batch-state/` + logs (no code changed): csv 86403s/12,195,781 runs/corpus 5506, rtf 86447s/34,393,191 runs/corpus 31353, pdf 86427s/792,655 runs/corpus 1028 — each ≥86400s, with `TARGET DONE` lines in the logs. Script semantics confirmed (`scripts/fuzz_batch.sh:74,87-90`): a run STOPs only on NEW crash/oom/timeout/leak artifacts per chunk (before/after count compare); the `findings=N` tally includes stale pre-existing files. pdf's `findings=16` are all stale pre-patch crashes (dated 2026-09-26–10-04, none newer) — zero new findings across the entire post-patch 86427s window (Oct 5–9 logs, all `chunk ok`). Patch wiring re-confirmed (`[patch.crates-io]` in `Cargo.toml`, lockfile references intact).
+
+Files Created: none. Files Modified: project/agent.md (header, Overall Progress, §9 fuzz bullets, AQ-013, §13 latest run, this log). Dependencies Added: None. Tests Executed: `cargo build --locked --offline` clean (vendored `pdf-extract` lib emits unused-var warnings — cosmetic, patch code only); debug-binary decode check over all 16 retained `fuzz/artifacts/fuzz_pdf/crash-*` files: 16 graceful (typed error or success), 0 signal deaths; full `cargo test --locked --offline` 142 passed, 0 failed, 1 ignored (matches 2026-10-04 baseline).
+
+Security Work: hostile-input containment re-proven on the full retained crash set (16/16, one more than AQ-013's 15-count — the extra file also predates the fresh run; no new crash class appeared in 792k post-patch runs).
+
+Important Notes: §14 item 3 (fuzz) now MET with evidence. P6-S05 still NOT MET: commit-remainder (incl. AQ-013 patch batch + skills/ deletions still uncommitted), architecture/security reviews (release-audit NOT APPROVED verdict stands until re-audit), tag. No commit, no tag (not requested this turn). Recommendation: leave the 16 stale crash files in place (triaged evidence, seeded into corpus); do not delete.
+
+Repository Status: main ahead by 1 + uncommitted patch batch (patches/, manifests, locks, tests, agent.md); no tag.
+
+## 2026-10-04 — PDF fuzz fix: vendored patch, 15/15 clean (Orchestrator)
+
+Session Summary: User said "fix the pdf 24h issue" (4th request) after approach ruling "Upstream fix/replace". Executed as user-authorized P4-S01 drift correction (extractors must not panic on malformed input), blueprint unchanged. Vendored `patches/pdf-extract` + `patches/adobe-cmap-parser` (same versions), hardened 11 panic sites to graceful degradation (maybe_deref dangling refs; CMap parse + caller + odd-length assert; ToUnicode shape/todo; Type0 empty-mapping fallback incl. get_byte_mapping caller; dead FontDescriptor validation removed; Tf hostile-font skip; Do hostile-XObject skip; fontless show_text span skip), each proven by a retained artifact. Fuzz corpus +15 seeds (649 files); pdf gate clock reset (pre-patch 3772s discarded — gate must run fresh). GATE MET 2026-10-09 (see log entry below).
+
+Files Created: patches/pdf-extract/*, patches/adobe-cmap-parser/* (vendored 0.12.1/0.4.1 + hardening). Files Modified: Cargo.toml + fuzz/Cargo.toml ([patch.crates-io]), Cargo.lock + fuzz/Cargo.lock (resolved to patch paths; fuzz lock also bumped wasm-bindgen*-macro 0.2.128→0.2.129 from offline cache), tests/phase4_integration.rs (+`pdf_objects` helper + `dangling_tounicode_never_panics` tripwire), project/agent.md (AQ-013, §9, this log).
+
+Dependencies Added: none new (same versions via path patch; colloquially a fork-of-two-functions held under patches/ with rationale comments).
+
+Tests Executed: full `cargo test --locked --offline` 142 passed, 0 failed, 1 ignored (was 141/0/1; +1 tripwire; phase4 14/14); 15/15 retained artifacts decode panic-free; post-patch fuzz smoke 120s/1171 runs/0 crashes/0 new artifacts. Residual: unproven expects remain (content-stream operands, W-array bounds, MediaBox, Subtype dispatch) — future fuzz will prove or not; pdf 24h MET 2026-10-09 (86427s post-patch, zero new findings — see 2026-10-09 log; ~18 wall-hours figure was the pre-completion estimate).
+
+Security Work: hostile-input abort surface reduced at the proven sites; containment (catch_unwind) retained as second layer; no new trust boundaries.
+
+Important Notes: P6-S05 still NOT MET (fresh pdf 24h, commit, reviews, tag). No commit, no tag (not requested).
+
+Repository Status: main ahead by 1 + uncommitted patch batch (patches/, manifests, locks, 1 test); no tag.
+
+## 2026-10-04 — Fuzz triage: csv/rtf 24h clean, pdf blocked (Orchestrator)
+
+Session Summary: User reported csv/rtf 24h done, pdf issue open. Verified from `fuzz/.batch-state/` + logs (no code changed): csv 86403s/12,195,781 runs/corpus 5506 findings 0; rtf 86447s/34,393,191 runs/corpus 31353 findings 0 (slow-units only, no crash/oom/timeout/leak); pdf 3772s/22,678 runs with 15 crash artifacts, batch STOP per `scripts/fuzz_batch.sh` crash-stop. Triaged all 15: 11x pdf-extract 0.12.1 `maybe_deref` expect("missing object reference") (lib.rs:177:52, ObjectNotFound), 3x adobe-cmap-parser 0.4.1 expect (lib.rs:169:31, CMap Mismatch), 1x pdf-extract expect("wrong type") (lib.rs:204:69). All inside `decode_whole` catch_unwind (`src/extract/pdf.rs:27`); cargo-fuzz `-Cpanic=abort` makes catch_unwind uncatchable under fuzz (upstream rust-fuzz behavior), so libFuzzer reports deadly-signal exit 77 while production (panic=unwind, `Cargo.toml:42`) returns `Corrupt`. Recorded as §9 blocker in Known Issues + §14 partial in Overall Progress/§9; P6-S05 still NOT MET; pdf 24h NOT claimed. Awaiting Architect ruling (pre-validate vs harness-filter vs accept-containment vs upstream fix).
+
+Files Created: none. Files Modified: project/agent.md (header date, Overall Progress, §9 bullets, this log). Dependencies Added: None. Tests Executed: none (evidence read from batch-state + log TARGET DONE lines + artifact listing; no suite re-run).
+
+Security Work: triage only; containment boundary (`decode_whole` catch_unwind) verified by code read + prior P4-S01 evidence, not re-proven by build this turn.
+
+Important Notes: Do not resume pdf fuzz until Architect rules — re-running the same command reproduces the same STOP on the existing 15 artifacts. Do not mark §14 item 3 met (csv/rtf only = 2/3 targets).
+
+Repository Status: unchanged (main ahead by 1, dirty tree incl. empty skills/, no tag).
+
+## 2026-09-25 — Release-audit Blocking fix (Orchestrator)
+
+Session Summary: User said "proceed with the fix" (release audit's bare-filename failure; LICENSE left for the user's license decision). Mapped all 7 `parent()` sites — 3 affected (md/html loaders, default output dir), 4 immune (constructed paths, exe path, dedup keys). Fixed + pinned + proven genuine. No architecture change.
+
+Completed Steps: `package::parent_or_dot` helper (empty→".") → applied at mod.rs md/html loaders + convert.rs default-output dir → unit test (bare/subdir/absolute) → e2e `bare_filename_in_cwd_converts` (child-process CWD, no global dir change; md-with-output + md-default-output cases) → stash-proven genuine (FAILED pre-fix, ok post-fix, stash popped clean) → full suite 141/0/1 zero warnings.
+
+Files Created: none. Files Modified: src/extract/package.rs (helper+test), src/extract/mod.rs (2 call sites), src/convert.rs (1 call site), tests/e2e.rs (+1 test), project/agent.md (this log).
+
+Dependencies Added: None.
+
+Tests Executed: full `cargo test --locked` 141 passed (139 + 2 new), 0 failed, 1 ignored, zero warnings, toolchain 1.98.0.
+
+Security Work: none (path handling; containment guards unchanged and still green).
+
+Important Notes: release-audit Blocking #2 resolved in code (re-audit still required for a verdict flip). LICENSE still needs the user's license text (cannot invent). P6-S05 still NOT MET (24h fuzz, push, reviews incl. re-audit, tag). No commit, no tag (not requested this turn).
+
+Repository Status: main at dca3ebc (unpushed); bare-name fix uncommitted; no tag.
+
+## 2026-09-25 — Release audit (Release Auditor)
+
+Session Summary: User invoked `@roles/release-auditor.md`. Walked all 28 requirements against live evidence (no assumed passes). Found a genuine Blocking bug by hand: bare-filename md/html conversion fails. No fixes made (role forbids it). Verdict: NOT APPROVED.
+
+Completed Steps: template + README + checklist + license/packaging reads → verified one README usage command end-to-end (tripped over the bug below; control case `./`-prefixed works, exit 0) → proven mechanism with a Rust probe (`parent()`→`Some("")`, `canonicalize("")`→NotFound) → full 28-item walk → report `project/release-audit-2026-09-25.md` + this log.
+
+Files Created: project/release-audit-2026-09-25.md (new, uncommitted). Files Modified: project/agent.md (this log).
+
+Blocking issues: (1) P6-S05 acceptance unmet (no tag/§14). (2) Bare-filename md/html fails — normalize empty parents + regression test (absolute paths unaffected; tests never caught it — always absolute Temp paths). (3) No shipped release. Advisory: no LICENSE; README staleness; stale Known-Issue bullets. Tallies: 20 pass / 3 blocking-fail / 1 advisory-fail / 4 N/A.
+
+Dependencies Added: None. Tests Executed: none (audit-only; suite untouched 139/0/1).
+
+Important Notes: P6-S05 still NOT MET. No commit, no tag. Also observed: Ebooks/ and sam/ evaporated between turns (env restore) — corpus evidence lives in agent.md only.
+
+Repository Status: main at dca3ebc (unpushed); release report uncommitted; no tag.
+
+## 2026-09-25 — Security findings fixed (Orchestrator)
+
+Session Summary: User said "fix all" (security audit findings). Fixed the Low (doc warning), ran cargo audit (installed 0.22.2 after 2 timed-out compile windows), found + fixed 2 Highs, re-verified to zero. No architecture change.
+
+Completed Steps: pdfium-setup.md trust warning → cargo-audit install → audit run (2 High quick-xml + 1 ttf-parser warning) → mirrored Highs to Known Issues immediately → quick-xml 0.38→0.41 → found second 0.38.4 copy via calamine 0.31 → calamine→0.36.1 (its quick-xml ^0.41 unifies; checked before bumping) → build clean, zero API breakage → suite 139/0/1 → re-audit 0 vulnerabilities → pdf-extract confirmed latest (ttf residual stands) → report statuses + capabilities table + Known Issues updated + this log.
+
+Files Created: none. Files Modified: docs/pdfium-setup.md (+warning), Cargo.toml (2 reqs), Cargo.lock (unified), project/agent.md (mirror/resolve/log), project/security-audit-2026-09-25.md (statuses + Highs addendum).
+
+Dependencies Added/Changed: quick-xml 0.38.4→0.41.0 (single copy now), calamine 0.31.0→0.36.1, atoi_simd 0.16.1→0.18.1; cruft removed (arbitrary, derive_arbitrary, zip 4.6.1). P2 API record: used surface (formula/hidden/number-format/date accessors) stable across the jump — no code changes needed.
+
+Tests Executed: full `cargo test --locked` 139 passed, 0 failed, 1 ignored, zero warnings (before AND after the bumps — the bumps changed zero test outcomes); `cargo audit` re-run: 0 vulnerabilities, 1 allowed warning (ttf-parser, documented residual).
+
+Security Work: this entire session. Auditor's Low → Resolved, Info → Resolved, 2 post-report Highs → Resolved with suite-as-regression.
+
+Important Notes: P6-S05 Acceptance Criteria still NOT MET (24h fuzz, push, reviews, tag). No commit, no tag (not requested this turn).
+
+Repository Status: main at dca3ebc (unpushed); findings-fix batch uncommitted; no tag.
+
+## 2026-09-25 — Security audit (Security Auditor)
+
+Session Summary: User invoked `@roles/security-auditor.md`. Ran adversarially per the role: threat model → ranked surface → traced data flow → live verification with temp tests (removed after) → report. No fixes made (role forbids it).
+
+Completed Steps: surface enumeration (CLI/config/env/OCR/files ranked; docs first) → guard reads (ZIP/XML/RTF/PDF caps, error Display, walkdir, loaders, batch isolation, pdfium order) → 2 live verification tests (OCR symlink-swap refused + marker intact; HTML `../` loader escape contained) → secrets/shell/stdin sweeps (clean/none) → report `project/security-audit-2026-09-25.md` from template.
+
+Files Created: project/security-audit-2026-09-25.md (new, uncommitted). Files Modified: project/agent.md (this log; Known Issues untouched — no Critical/High to mirror).
+
+Findings: 0 Critical, 0 High, 0 Medium, 1 Low (pdfium adjacent-exe fallback load — local, documented order, needs install-dir trust; doc-note recommended via normal path), 1 Informational (cargo audit never run — no network here; pre-release gate). Full class checklist + both passing probe codes in the report.
+
+Dependencies Added: None. Tests Executed: 2 temp verification tests, both green, then removed (code kept in report for the remediation record); suite untouched 139/0/1.
+
+Important Notes: P6-S05 Acceptance Criteria still NOT MET (env-gated remainder + Low doc-note now queued). No commit, no tag (not requested this turn).
+
+Repository Status: main at dca3ebc (unpushed); security report + fuzz_batch.sh + fuzz/.gitignore + ci-setup edits uncommitted; no tag.
+
+## 2026-09-25 — Third audit-and-fix (Orchestrator as self-audit)
+
+Session Summary: User invoked `@roles/audit-and-fix.md`. No architect.md/designer.md exist — equivalent-file rule applied (architecture/blueprint as decisions; Designer N/A headless CLI), same as the two prior audits. Phases 0–6 code unchanged since the 2026-09-24 audit except this session's AQ-011/012/link/ocr changes, which were read line-by-line (convert.rs helper+call site, pdf.rs loop+warning count, both renderer Link arms, ocr.rs allow); older phases covered by the prior code-level pass + this run's regression evidence (139/0/1, zero warnings). No src changes made by this audit except none — single fix is F1 below.
+
+Completed Steps: role check → audit opened (Review History) → unwrap/allow/Command/fs sweeps (9 unwraps all test/infallible-position; 1 justified allow; argv-only Command; staged/guarded writes; no TODOs) → changed-file deep reads → leftover-diff review (pdf_layout shadow/preflight work: commented, prior-verified, stands for next layout CI re-verify) → guide var-name cross-check vs ci.yml (10/10 match) → F1 fix → close.
+
+Files Created: none. Files Modified: fuzz/.gitignore (+logs, .batch-state), project/agent.md (open/close + this log).
+
+Findings — FIXED (1): F1 cross-cutting run-hygiene: `fuzz/logs/` + `fuzz/.batch-state/` escaped gitignore (trial logs showed as untracked); added, status clean. No test re-run needed (non-code; suite 139/0/1 stands).
+Findings — FLAGGED (no new ones): standing security-auditor.md referral (per role, adversarial pass out of scope here); env-gated remainder (24h fuzz, push, reviews, tag); pdf_layout next re-verify on layout CI run with native lib.
+Compliance re-check: zero new drift/omissions/additions — blueprint-vs-tree known items unchanged (negative_suite keep-closed, xml.rs gap recorded, AQ-011/012 closed with tests). Quality re-check: new code follows house (minified) conventions; no rewrites proposed (no behavior-neutral gain available).
+
+Dependencies Added: None. Tests Executed: none new (evidence: suite 139/0/1 zero warnings from prior turn; F1 touches no code).
+
+Important Notes: P6-S05 Acceptance Criteria still NOT MET (env-gated remainder). No commit, no tag (not requested this turn).
+
+Repository Status: main at dca3ebc (unpushed); audit fix (fuzz/.gitignore) + fuzz_batch.sh + ci-setup edits uncommitted; no tag.
+
+## 2026-09-25 — Batch fuzz runner (Orchestrator)
+
+Session Summary: User asked for the 24h fuzz prepared in batch with configurable time, resumable to completion. Built `scripts/fuzz_batch.sh` (budget/chunks/resume/crash-stop/evidence), trial-proven, docs pointed at it. No product behavior changed.
+
+Completed Steps: harness check (nightly + cargo-fuzz 0.13.2; corpus/artifacts/state all gitignored) → script (flags `--targets/--hours/--chunk-min/--logs/--reset/--dry-run`; ≥30s minimums after catching that `-max_total_time=0` means unlimited — first trial hung and had to be killed) → guard tests (bad flag/tiny budget/bogus target fail fast) → trial `--targets rtf --hours 0.05 --chunk-min 1`: 3 chunks (60+60+48 remainder-shortened), 186s/270,761 runs/0 findings, corpus 4162→4797 → resume re-run immediate-DONE → reset verified → `docs/ci-setup.md` §5 rewritten around the script.
+
+Files Created: scripts/fuzz_batch.sh (new, uncommitted). Files Modified: docs/ci-setup.md (§5), project/agent.md (this log).
+
+Dependencies Added: None.
+
+Tests Executed: script trials as above (trial state reset after; corpus additions remain on disk, gitignored).
+
+Security Work: none; crash-stop path is code-reviewed but untested live (no crash induced) — stated, not claimed.
+
+Process Note: hung-trial fallout (stray load ~6.9 decaying after kill; stray `ps|rg` also timed out once) — minimums now prevent recurrence; run one target at a time on loaded hosts.
+
+Important Notes: §14 24h gate still open (trial ≈0.05 CPU-h). Run: `scripts/fuzz_batch.sh` (≈18 wall-hours on 4 cores for all three). P6-S05 Acceptance Criteria still NOT MET. No commit, no tag (not requested this turn).
+
+Repository Status: main at dca3ebc (unpushed); scripts/fuzz_batch.sh + docs/ci-setup.md uncommitted; no tag.
 
 ## 2026-09-25 — AQ-012 fixed (Orchestrator)
 
@@ -846,3 +1003,5 @@ Prior sessions (startup, source batch, revisions 2–4, skills research) archive
 | self-audit | v2.0 (merged) | Phase-by-Phase + Full-Project + code-level audit: 8 findings, 4 fixed (git, status, security checklist, .gitignore), 0 code bugs, 3 design-level flags | Git init, status correction, security checklist, doc verification | **Closed** |
 | self-audit | v2.0 (merged) | 2026-09-24 audit-and-fix session: phase-by-phase + full-project code-level re-audit incl. unvalidated P4-S01 pdf-extract change | Fixed C1 (P4-S02 attribution guard), C2 (P5-S03 OCR warning gate); P4-S01 validated 96→101 passed; remainder flagged as queued single steps (see log) | **Closed** |
 | self-audit | v2.0 (merged) | Scope: Phase-by-Phase + Full-Project (code-level, all 42 steps + cross-cutting). Architect/designer role files absent — architecture.md/blueprint.md used as Architect decisions per equivalent-file rule; Designer N/A (headless CLI, arch §1) | Fixed 15 clear findings (C1–C15, see Session Log); 22 items flagged for Architect (A1–A22, see report in log); security items referred to security-auditor.md | **Closed** |
+| self-audit | v2.0 (merged) | 2026-09-25 audit-and-fix session: third full pass; focus on post-2026-09-24 changes (AQ-011/012, link fallback, ocr allow, CI/fuzz/batch-test scripts, docs) + regression sweep | Fixed F1 (fuzz run-output gitignore); no new compliance/quality findings; standing referrals unchanged | **Closed** |
+| self-audit | v2.0 (merged) | 2026-09-25 audit-and-fix session: fourth full pass; focus on post-third-audit changes (dep bumps quick-xml/calamine, bare-name fix, security/release reports) + regression sweep | TBD (see Session Log) | **Open** |

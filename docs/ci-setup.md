@@ -64,18 +64,29 @@ Config error) — that is the designed behavior, never silently skipped.
 
 ## 5. Full fuzz (local machine or self-hosted runner, ~18 wall-hours on 4 cores)
 
-From `fuzz/`, one target at a time (parallelize across hosts and sum CPU-hours
-from the `stat::` lines if you prefer):
+Use the batch runner — configurable budget, resumable chunks, crash-stop:
+
+```sh
+scripts/fuzz_batch.sh                                  # 24h x rtf+pdf+csv, 60-min chunks
+scripts/fuzz_batch.sh --targets pdf --hours 24         # one target only
+scripts/fuzz_batch.sh --hours 6 --chunk-min 30         # short slices (killed runs resume on re-run)
+scripts/fuzz_batch.sh --reset --targets rtf            # drop resume state, keep corpus
+```
+
+How it works: each target runs in `--chunk-min` libFuzzer slices until `--hours`
+of CPU time accumulates; progress lives in `fuzz/.batch-state/` (gitignored, survives
+kills — re-run the same command to resume); corpus grows in `fuzz/corpus/`
+(gitignored); any crash/oom/timeout artifact stops everything with exit 1 and the
+artifact path; per-run logs go to `fuzz/logs/` with agent.md-ready evidence lines
+at the end. Gate: 24 CPU-hours per target, zero findings. On the first artifact:
+stop, file the input, fix, restart that target's clock. Manual equivalent (single
+unbroken run, needs a host that stays up):
 
 ```sh
 cargo +nightly fuzz run fuzz_rtf -- -max_total_time=86400
 cargo +nightly fuzz run fuzz_pdf -- -max_total_time=86400
 cargo +nightly fuzz run fuzz_csv -- -max_total_time=86400
 ```
-
-Gate: 24 CPU-hours per target, zero crash/oom/timeout artifacts. On the first
-artifact: stop, file the input, fix, restart that target's clock. Record final
-run counts + SHAs of any artifacts in `project/agent.md` §13.
 
 ## 6. After green: reviews, then tag
 

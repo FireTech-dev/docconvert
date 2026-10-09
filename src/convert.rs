@@ -96,7 +96,7 @@ fn asset_namespace(stem:&str)->(String,bool){
 }
 pub fn convert_file(path:&Path,opts:&Options)->Result<Report>{
     let started=std::time::Instant::now();let(detection,mut doc,format,reason)=load(path,opts,true)?;
-    let dir=opts.output.clone().unwrap_or_else(||path.parent().unwrap_or(Path::new(".")).to_path_buf());
+    let dir=opts.output.clone().unwrap_or_else(||extract::package::parent_or_dot(path).to_path_buf());
     let stem=path.file_stem().and_then(|s|s.to_str()).unwrap_or("document");
     let(namespace,shortened)=asset_namespace(stem);
     if shortened{doc.warnings.push("long input filename shortened in asset paths; outputs keep the full name".into())}

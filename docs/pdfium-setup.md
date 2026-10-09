@@ -17,6 +17,11 @@ Match the **process architecture**, not just the host OS. Linux x86_64 and aarch
 macOS x86_64 and arm64, Windows x86_64 each require their own native build.
 Do not load a library supplied by a document or an untrusted directory.
 
+Warning (security audit 2026-09-25, Low): resolution step 3 loads whatever library
+sits beside the executable without verification — install the binary in a
+directory attackers cannot write to, or set an explicit path (steps 1–2) so the
+fallback never triggers.
+
 Build PDFium yourself using its upstream build instructions, or review a prebuilt
 release from https://github.com/bblanchon/pdfium-binaries/releases. Select the
 ABI/revision and platform matching the pinned Rust binding. Verify provenance,
@@ -62,11 +67,14 @@ asset `pdfium-linux-x64.tgz` (3,743,765 B):
   Review them before redistributing; no binary is bundled with this source delivery.
 
 With `PDFIUM_DYNAMIC_LIB_PATH` pointed at that library: full
-`cargo test --features pdf-layout` green (140 passed, 1 ignored), including the
-native OCR end-to-end test; layout release binary 4,147,384 B (3.96MiB),
-SHA256 `796bd272dd3ec1b94e66a5c7f2455cb11d79c5974e7676ba200b9eeb0dfbc989`.
-Default release binary 4,307,648 B (4.11MiB, ≤5MB), SHA256
-`f327a17b50e10c1d067fdbc00ffbd01bd2b4d6d958f2a39016797cc39b2473df`.
+`cargo test --features pdf-layout` green (144 passed, 1 ignored), including the
+native OCR end-to-end test; layout release binary 4,188,216 B (3.99MiB),
+SHA256 `248688cfac694c47674348972ebf4211c1ce5025c13cb840b4b661c49ad6d3f5`
+(archive `9b48f485…`). Default release binary 4,307,952 B (4.11MiB, ≤5MB).
+Real-PDF quality notes: InDesign double-draws display type (measured shadow
+offsets (1.96,2.00)@40pt and (0.74,0.52)@12pt) — handled by glyph-dedupe (1pt)
+plus systematic-shadow dropping (10pt bar, multi-bin, distinct-chars guard);
+cover ornaments that survive are genuine source layout (poppler-confirmed).
 Release builds are same-target sequential: rebuilding one profile overwrites
 `target/release/docconvert` — package each profile's binary immediately
 (per `skills/packaging.md`), sizes above are the recorded evidence.

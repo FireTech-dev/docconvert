@@ -418,10 +418,27 @@ pinned by `layout_encrypted_reports_encrypted`.
 - Stale root `libpdfium.so` (md5 `d0cc88ec…`) proven incompatible with these
   bindings; gitignored, left in place (user's file).
 
-### Still open
+### Quality-fix addendum (2026-09-24, same session)
 
-Real-doc corpus (needs user documents), full 24h fuzz hours, CI execution
-(needs vars + runners), initial commit/tag, security-auditor.md referral.
+Cover doubling ("AAUUTTOOMMAATTEE") root-caused via throwaway pdfium probe
+(removed after): systematic double-draw, not decoder noise. Fixed with
+`dedupe_glyphs` 1.0pt tolerance + `drop_shadows` multi-bin loop at 10pt bar
+(first attempt applied top-bin-only and missed subtitle shadows behind title
+shadows; decoy bins skipped via distinct-chars guard, pinned by hijack + two-
+layer unit tests and a `shadow_double_draw_renders_once` e2e). Automate cover
+verified single-copy; remnants poppler-confirmed as genuine ornament. Suites
+default 131/1, layout 144/1. Layout release re-measured 4,188,216 B.
+
+### Still open (updated 2026-09-24 corpus run)
+
+~~Real-doc corpus~~ DONE (user-supplied `pdf/`, 11 files): 8 converted
+(11.7MB text, 0 U+FFFD), 3 typed `Corrupt` (2 decode-defeats incl. 309pp
+scanned/odd-font Active Calculus, 1 xref-limit on 510pp/17.8MB Automate),
+0 crashes, 0 partial outputs. Layout chapter check: 19pp/5.4s, 4 tables,
+12 images. Caveats: layout on font-dense Trigonometry >5min; wall≈2×user CPU
+(fsync-heavy env); files in this environment shift between turns (measure live).
+Full 24h fuzz hours, CI execution (needs vars + runners), initial commit/tag
+(commit declined by user), security-auditor.md referral.
 
 ---
 

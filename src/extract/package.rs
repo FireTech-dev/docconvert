@@ -8,6 +8,16 @@ pub const MAX_TOTAL: usize = 200 * 1024 * 1024;
 pub const MAX_DEPTH: usize = 64;
 pub const MAX_ELEMENTS: usize = 500_000;
 
+/// Parent directory, treating a bare filename's empty parent as the working
+/// directory (release audit: `Path::parent` yields `Some("")` for bare names,
+/// and `"".canonicalize()` fails with NotFound — a plain `unwrap_or` never
+/// fires, which broke bare-filename conversion for loader-based formats).
+pub fn parent_or_dot(path: &std::path::Path) -> &std::path::Path {
+    path.parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(std::path::Path::new("."))
+}
+
 pub struct Package { pub entries: BTreeMap<String, Vec<u8>> }
 impl Package {
     pub fn open(bytes: &[u8]) -> Result<Self> {
@@ -261,12 +271,20 @@ pub fn read_capped(path: &std::path::Path, max: u64) -> Result<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    use super::read_capped;
+    use super::{parent_or_dot, read_capped};
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT: AtomicU64 = AtomicU64::new(0);
     fn unique_path() -> std::path::PathBuf {
         let n = NEXT.fetch_add(1, Ordering::Relaxed);
         std::env::temp_dir().join(format!("docconvert-read-capped-{}-{n}", std::process::id()))
+    }
+    #[test]
+    fn parent_or_dot_bare_name_is_dot(){
+        // Release audit: Path::parent yields Some("") for bare names, and
+        // "".canonicalize() fails — a plain unwrap_or never fires.
+        assert_eq!(parent_or_dot(std::path::Path::new("a.md")), std::path::Path::new("."));
+        assert_eq!(parent_or_dot(std::path::Path::new("sub/a.md")), std::path::Path::new("sub"));
+        assert_eq!(parent_or_dot(std::path::Path::new("/x/a.md")), std::path::Path::new("/x"));
     }
     #[test]
     fn read_capped_rejects_over_max() {
